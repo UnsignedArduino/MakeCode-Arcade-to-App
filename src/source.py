@@ -64,7 +64,17 @@ def download_source(config: Config, cwd: Path,
         for item in extract_path.iterdir():
             shutil.move(item, source_code_path / item.name)
         extract_path.rmdir()
+    elif config.source_type == SourceType.PATH:
+        logger.info(f"Copying source from path")
+        source_code_path.mkdir(parents=True, exist_ok=True)
+        # Copy the contents of the source directory to the source_code_path
+        source_path = Path(config.source)
+        for item in source_path.iterdir():
+            if item.is_dir():
+                shutil.copytree(item, source_code_path / item.name)
+            else:
+                shutil.copy2(item, source_code_path / item.name)
     else:
-        raise NotImplementedError("Unsupported source (for now)")
+        raise ValueError(f"Unknown source type {config.source_type}")
     logger.debug(f"Source code path: {source_code_path}")
     return source_code_path
