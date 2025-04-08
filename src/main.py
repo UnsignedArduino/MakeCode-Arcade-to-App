@@ -21,6 +21,8 @@ parser.add_argument("--skip-env-prep", action="store_true",
                     help="Skip environment preparation. This is useful for debugging.")
 parser.add_argument("--skip-source-download", action="store_true",
                     help="Skip source code download. This is useful for debugging.")
+parser.add_argument("--skip-ext-install", action="store_true",
+                    help="Skip extension installation. This is useful for debugging.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -38,6 +40,7 @@ if no_cache:
     logger.info("No cache option selected. Ignoring cached files.")
 skip_env_prep = bool(args.skip_env_prep)
 skip_source_download = bool(args.skip_source_download)
+skip_ext_install = bool(args.skip_ext_install)
 
 cwd = config_path.parent / config.name
 logger.debug(f"Current working directory: {cwd} (source code directory will be "
@@ -61,3 +64,9 @@ if skip_source_download:
 else:
     logger.debug("Downloading source code")
     source_code_path = download_source(config, cwd, no_cache)
+
+if skip_ext_install:
+    logger.debug("Skipping extension installation")
+else:
+    logger.debug("Installing extensions")
+    run_shell_command("pxt install", cwd=source_code_path)
