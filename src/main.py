@@ -2,10 +2,10 @@ import logging
 from argparse import ArgumentParser
 from pathlib import Path
 
-from config import parse_config
-from source import download_source
-from src.utils.cmd import run_shell_command
-from src.utils.filesystem import delete_these
+from mkcd_to_app.config import parse_config
+from mkcd_to_app.source import download_source
+from utils.cmd import run_shell_command
+from utils.filesystem import delete_these
 from utils.logger import create_logger, set_all_stdout_logger_levels
 
 logger = create_logger(name=__name__, level=logging.INFO)

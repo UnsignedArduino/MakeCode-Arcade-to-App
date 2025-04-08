@@ -3,8 +3,8 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from config import Config, SourceType
-from src.utils.cmd import run_command, run_shell_command
+from mkcd_to_app.config import Config, SourceType
+from utils.cmd import run_command, run_shell_command
 from utils.logger import create_logger
 
 logger = create_logger(name=__name__, level=logging.INFO)
