@@ -5,9 +5,10 @@ from pathlib import Path
 from config import parse_config
 from source import download_source
 from src.utils.cmd import run_shell_command
-from utils.logger import create_logger
+from src.utils.filesystem import delete_these
+from utils.logger import create_logger, set_all_stdout_logger_levels
 
-logger = create_logger(name=__name__, level=logging.DEBUG)
+logger = create_logger(name=__name__, level=logging.INFO)
 
 parser = ArgumentParser(description="Convert your MakeCode Arcade games into a "
                                     "standalone offline executable!")
@@ -15,12 +16,17 @@ parser.add_argument("config_path", type=Path,
                     help="Path to the YAML configuration file.")
 parser.add_argument("--no-cache", action="store_true",
                     help="Do not use cached files. This will delete and download all "
-                         "necessary files")
+                         "necessary files.")
 parser.add_argument("--skip-env-prep", action="store_true",
-                    help="Skip environment preparation. This is useful for debugging. ")
+                    help="Skip environment preparation. This is useful for debugging.")
 parser.add_argument("--skip-source-download", action="store_true",
-                    help="Skip source code download. This is useful for debugging. ")
+                    help="Skip source code download. This is useful for debugging.")
+parser.add_argument("--debug", action="store_true",
+                    help="Enable debug logging.")
 args = parser.parse_args()
+debug = bool(args.debug)
+if debug:
+    set_all_stdout_logger_levels(logging.DEBUG)
 logger.debug(f"Received arguments: {args}")
 
 config_path = Path(args.config_path)
@@ -45,19 +51,10 @@ else:
     logger.info(f"Setting up environment")
     if no_cache:
         logger.debug("Checking for existing environment to remove")
-        stuff_to_check = ["node_modules", "package.json", "package-lock.json"]
-        for item in stuff_to_check:
-            item_path = cwd / item
-            if item_path.exists():
-                logger.debug(f"Removing {item_path}")
-                if item_path.is_dir():
-                    import shutil
-
-                    shutil.rmtree(item_path)
-                else:
-                    item_path.unlink()
+        delete_these(["node_modules", "package.json", "package-lock.json"], cwd)
     run_shell_command("pxt target arcade", cwd=cwd)
 
+# Download source code
 if skip_source_download:
     logger.debug("Skipping source code download")
     source_code_path = cwd / f"{config.name} source"

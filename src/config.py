@@ -7,7 +7,7 @@ import yaml
 
 from utils.logger import create_logger
 
-logger = create_logger(name=__name__, level=logging.DEBUG)
+logger = create_logger(name=__name__, level=logging.INFO)
 
 
 class SourceType(Enum):

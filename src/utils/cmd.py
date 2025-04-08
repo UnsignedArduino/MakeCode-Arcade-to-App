@@ -6,7 +6,7 @@ from typing import Optional, Sequence
 
 from .logger import create_logger
 
-logger = create_logger(name=__name__, level=logging.DEBUG)
+logger = create_logger(name=__name__, level=logging.INFO)
 
 
 def run_command(command: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[
