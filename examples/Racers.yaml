@@ -7,13 +7,12 @@ author: UnsignedArduino
 version: 1.3.2
 
 # Game source - where the game code is located
-# Can be a GitHub repository (.git ending is optional) that optionally specifies a commit or version,
+# Can be a GitHub repository (.git ending is optional) that specifies something to check out,
 # a MakeCode Arcade share link, (ex. https://arcade.makecode.com/84426-33815-03715-00484)
 # or a path (ex. F:/Racers)
-# >>> Currently only GitHub (not complex) is supported <<<
-source: https://github.com/UnsignedArduino/Racers
-#source:
-#  url: https://github.com/UnsignedArduino/Racers
-#  checkout: v1.3.2  # Could be a branch, tag, commit hash, etc. (it's passed to `git checkout` directly)
+# >>> Currently only the GitHub source is supported <<<
+source:
+  url: https://github.com/UnsignedArduino/Racers
+  checkout: master  # Could be a branch, tag, commit hash, etc. (it's passed to `git checkout` directly)
 #source: https://arcade.makecode.com/84426-33815-03715-00484
 #source: F:/Racers

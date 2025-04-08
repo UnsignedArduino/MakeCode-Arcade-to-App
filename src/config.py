@@ -28,7 +28,7 @@ class Config:
 
     source: str
     source_type: SourceType
-    source_checkout: Optional[str] = None  # For complex GitHub sources
+    source_checkout: Optional[str] = None  # For GitHub sources
 
 
 def determine_source_type(source: str | dict) -> SourceType:
@@ -41,8 +41,6 @@ def determine_source_type(source: str | dict) -> SourceType:
     # We could do more checks for validity / strictness here
     if type(source) is not str:
         # Should have url and checkout
-        return SourceType.GITHUB
-    if "github.com" in source:
         return SourceType.GITHUB
     elif "makecode.com" in source:
         return SourceType.SHARE_LINK

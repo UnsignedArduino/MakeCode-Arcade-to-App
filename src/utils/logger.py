@@ -23,7 +23,7 @@ def create_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     # https://stackoverflow.com/a/16066513/10291933
     stdout_handler = logging.StreamHandler(stream=sys.stdout)
     stdout_handler.setLevel(level=level)
-    # stdout_handler.addFilter(lambda record: record.levelno <= logging.INFO)
+    stdout_handler.addFilter(lambda record: record.levelno < logging.WARNING)
     stdout_handler.setFormatter(fmt=console_formatter)
     if stdout_handler not in logger.handlers:
         logger.addHandler(hdlr=stdout_handler)
