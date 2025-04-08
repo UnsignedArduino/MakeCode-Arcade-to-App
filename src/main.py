@@ -1,6 +1,8 @@
 import logging
 from argparse import ArgumentParser
 from pathlib import Path
+import re
+import subprocess
 
 from mkcd_to_app.config import parse_config
 from mkcd_to_app.source import download_source
@@ -23,6 +25,8 @@ parser.add_argument("--skip-source-download", action="store_true",
                     help="Skip source code download. This is useful for debugging.")
 parser.add_argument("--skip-ext-install", action="store_true",
                     help="Skip extension installation. This is useful for debugging.")
+parser.add_argument("--skip-build", action="store_true",
+                    help="Skip building the project. This is useful for debugging.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -49,7 +53,7 @@ cwd.mkdir(parents=True, exist_ok=True)
 
 # pxt target arcade
 if skip_env_prep:
-    logger.debug("Skipping environment preparation")
+    logger.info("Skipping environment preparation")
 else:
     logger.info(f"Setting up environment")
     if no_cache:
@@ -59,14 +63,33 @@ else:
 
 # Download source code
 if skip_source_download:
-    logger.debug("Skipping source code download")
+    logger.info("Skipping source code download")
     source_code_path = cwd / f"{config.name} source"
 else:
-    logger.debug("Downloading source code")
+    logger.info("Downloading source code")
     source_code_path = download_source(config, cwd, no_cache)
 
+# pxt install
 if skip_ext_install:
-    logger.debug("Skipping extension installation")
+    logger.info("Skipping extension installation")
 else:
-    logger.debug("Installing extensions")
+    logger.info("Installing extensions")
+    if no_cache:
+        logger.debug("Cleaning")
+        run_shell_command("pxt clean", cwd=source_code_path)
     run_shell_command("pxt install", cwd=source_code_path)
+
+# pxt build
+binary_js_path = source_code_path / "built" / "debug" / "binary.js"
+if args.skip_build:
+    logger.info("Skipping build")
+else:
+    logger.info("Building project")
+    if no_cache:
+        logger.debug("Checking for binary to remove")
+        if binary_js_path.exists():
+            logger.debug(f"Deleting {binary_js_path}")
+            binary_js_path.unlink()
+    run_shell_command("pxt build", cwd=source_code_path)
+
+logger.debug(f"Binary JS path: {binary_js_path}")

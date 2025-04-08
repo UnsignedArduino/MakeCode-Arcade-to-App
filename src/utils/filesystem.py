@@ -18,6 +18,7 @@ def delete_these(dirs_and_files: list[str], dir: Path):
     for file in dirs_and_files:
         file_path = dir / file
         if file_path.exists():
+            logger.debug(f"Deleting {file_path}")
             if file_path.is_dir():
                 shutil.rmtree(file_path)
             else:
