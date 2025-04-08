@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 import yaml
 
@@ -17,18 +18,30 @@ class SourceType(Enum):
 
 @dataclass
 class Config:
+    """
+    Configuration class.
+    """
+    name: str
+    description: str
+    author: str
+    version: str
+
     source: str
     source_type: SourceType
+    source_checkout: Optional[str] = None  # For complex GitHub sources
 
 
-def determine_source_type(source: str) -> SourceType:
+def determine_source_type(source: str | dict) -> SourceType:
     """
     Determines the source type based on the provided source string.
 
-    :param source: The source string.
+    :param source: The source string or dictionary.
     :return: The SourceType enum value.
     """
-    # We could do more checks for validity
+    # We could do more checks for validity / strictness here
+    if type(source) is not str:
+        # Should have url and checkout
+        return SourceType.GITHUB
     if "github.com" in source:
         return SourceType.GITHUB
     elif "makecode.com" in source:
@@ -50,9 +63,21 @@ def parse_config(yaml_text: str) -> Config:
     src = result.get("source")
     src_type = determine_source_type(src)
     logger.debug(f"Determined source type for {src} is {src_type}")
+    src_checkout = None
+    if type(src) is not str:
+        src_checkout = src.get("checkout")
+        src = src.get("url")
+        logger.debug(f"Complex GitHub source detected - will checkout {src_checkout} "
+                     f"for url {src}")
+
     config = Config(
+        name=result.get("name"),
+        description=result.get("description"),
+        author=result.get("author"),
+        version=result.get("version"),
         source=src,
-        source_type=src_type
+        source_type=src_type,
+        source_checkout=src_checkout
     )
     logger.debug(f"Parsed configuration: {config}")
     return config
