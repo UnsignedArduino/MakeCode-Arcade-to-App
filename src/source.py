@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from config import Config, SourceType
-from src.utils.cmd import run_command
+from src.utils.cmd import run_command, run_shell_command
 from utils.logger import create_logger
 
 logger = create_logger(name=__name__, level=logging.DEBUG)
@@ -47,7 +47,24 @@ def download_source(config: Config, cwd: Path,
         run_command(["git", "clone", config.source, source_code_path], cwd=cwd)
         logger.info(f"Checking out {config.source_checkout}")
         run_command(["git", "checkout", config.source_checkout], cwd=source_code_path)
+    elif config.source_type == SourceType.SHARE_LINK:
+        logger.info(f"Downloading source from share link")
+        source_code_path.mkdir(parents=True, exist_ok=True)
+        run_shell_command(f"pxt extract {config.source}", cwd=source_code_path)
+        # Since we're using pxt extract, we need to move the contents of the directory
+        # inside source_code_path to source_code_path itself
+        extract_path = None
+        for item in source_code_path.iterdir():
+            if item.is_dir():
+                # This is the directory created by pxt extract
+                extract_path = Path(item)
+                break
+        logger.debug(
+            f"Moving extracted directory contents {extract_path} to {source_code_path}")
+        for item in extract_path.iterdir():
+            shutil.move(item, source_code_path / item.name)
+        extract_path.rmdir()
     else:
-        raise NotImplementedError("Only GitHub source is supported for now")
+        raise NotImplementedError("Unsupported source (for now)")
     logger.debug(f"Source code path: {source_code_path}")
     return source_code_path
