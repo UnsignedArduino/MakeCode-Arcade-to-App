@@ -1,8 +1,6 @@
 import logging
 from argparse import ArgumentParser
 from pathlib import Path
-import re
-import subprocess
 
 from mkcd_to_app.config import parse_config
 from mkcd_to_app.source import download_source
@@ -45,6 +43,7 @@ if no_cache:
 skip_env_prep = bool(args.skip_env_prep)
 skip_source_download = bool(args.skip_source_download)
 skip_ext_install = bool(args.skip_ext_install)
+skip_build = bool(args.skip_build)
 
 cwd = config_path.parent / config.name
 logger.debug(f"Current working directory: {cwd} (source code directory will be "
@@ -81,7 +80,7 @@ else:
 
 # pxt build
 binary_js_path = source_code_path / "built" / "debug" / "binary.js"
-if args.skip_build:
+if skip_build:
     logger.info("Skipping build")
 else:
     logger.info("Building project")
