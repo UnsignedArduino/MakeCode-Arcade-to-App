@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Callable
 
 import requests
+from PIL import Image
 from bs4 import BeautifulSoup
 
-from mkcd_to_app.config import Config, SourceType
+from mkcd_to_app.config import Config, IconSourceType, SourceType
 from utils.cmd import run_shell_command
 from utils.logger import create_logger
 
@@ -94,7 +95,6 @@ def generate_website(config: Config, prj_name: str, cwd: Path, bin_js_path: Path
     if res.ok:
         sim_html = res.text
     else:
-        logger.error(f"Failed to download simulator: {res.status_code} {res.reason}")
         raise Exception(f"Failed to download simulator: {res.status_code} {res.reason}")
     # Analyze simulator HTML for required CSS and JS files
     logger.debug("Analyzing simulator HTML for required CSS and JS files")
@@ -113,8 +113,6 @@ def generate_website(config: Config, prj_name: str, cwd: Path, bin_js_path: Path
                 # Rewrite CSS file to use relative paths
                 css["href"] = css_url.split("/")[-1]
             else:
-                logger.error(
-                    f"Failed to download CSS file: {res.status_code} {res.reason}")
                 raise Exception(
                     f"Failed to download CSS file: {res.status_code} {res.reason}")
     for js in js_scripts:
@@ -128,9 +126,23 @@ def generate_website(config: Config, prj_name: str, cwd: Path, bin_js_path: Path
                 # Rewrite JS file to use relative paths
                 js["src"] = js_url.split("/")[-1]
             else:
-                logger.error(
-                    f"Failed to download JS file: {res.status_code} {res.reason}")
                 raise Exception(
                     f"Failed to download JS file: {res.status_code} {res.reason}")
     sim_html = soup.prettify(formatter="html5")
     (new_dir / "public" / "---simulator.html").write_text(sim_html)
+    # Copy or download icon to favicon.ico in public directory
+    if config.icon:
+        logger.debug(f"Found icon to use")
+        if config.icon_source_type == IconSourceType.URL:
+            logger.debug(f"Downloading icon from {config.icon}")
+            res = requests.get(config.icon)
+            if res.ok:
+                im = Image.open(res.content)
+            else:
+                raise Exception(
+                    f"Failed to download icon: {res.status_code} {res.reason}")
+        else:
+            logger.debug(f"Reading icon from {config.icon}")
+            im = Image.open(config.icon)
+        logger.debug("Saving icon as favicon.ico")
+        im.save(new_dir / "public" / "favicon.ico")

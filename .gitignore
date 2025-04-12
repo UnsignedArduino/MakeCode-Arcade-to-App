@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 examples/*
 !examples/*.yaml
+!examples/*.png

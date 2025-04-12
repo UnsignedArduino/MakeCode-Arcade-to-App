@@ -42,7 +42,7 @@ logger.debug(f"Received arguments: {args}")
 
 config_path = Path(args.config_path)
 logger.info(f"Loading configuration from {config_path}")
-config = parse_config(config_path.read_text())
+config = parse_config(config_path.read_text(), config_path.parent)
 
 no_cache = bool(args.no_cache)
 if no_cache:
@@ -99,7 +99,6 @@ else:
             logger.debug(f"Deleting {binary_js_path}")
             binary_js_path.unlink()
     run_shell_command("pxt build", cwd=source_code_path)
-
 logger.debug(f"Binary JS path: {binary_js_path}")
 
 # yarn create vite, copy files, and substitute values
@@ -122,7 +121,7 @@ if skip_website_build:
 else:
     logger.info("Building website")
     run_shell_command("yarn build", cwd=website_path)
-    logger.debug(f"Website build completed. Files are in {website_dist_path}")
+logger.debug(f"Static website files path: {website_dist_path}")
 
 if build_website_only:
     logger.info("Exiting after building website")
