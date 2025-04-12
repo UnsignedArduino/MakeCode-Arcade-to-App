@@ -4,6 +4,7 @@ from pathlib import Path
 
 from mkcd_to_app.config import parse_config
 from mkcd_to_app.source import download_source
+from mkcd_to_app.website import generate_website
 from utils.cmd import run_shell_command
 from utils.filesystem import delete_these
 from utils.logger import create_logger, set_all_stdout_logger_levels
@@ -23,8 +24,14 @@ parser.add_argument("--skip-source-download", action="store_true",
                     help="Skip source code download. This is useful for debugging.")
 parser.add_argument("--skip-ext-install", action="store_true",
                     help="Skip extension installation. This is useful for debugging.")
-parser.add_argument("--skip-build", action="store_true",
-                    help="Skip building the project. This is useful for debugging.")
+parser.add_argument("--skip-bin-build", action="store_true",
+                    help="Skip building the game binary. This is useful for debugging.")
+parser.add_argument("--skip-website-gen", action="store_true",
+                    help="Skip website generation. This is useful for debugging.")
+parser.add_argument("--skip-website-build", action="store_true",
+                    help="Skip building the website. This is useful for debugging.")
+parser.add_argument("--build-website-only", action="store_true",
+                    help="Build the website to static files only.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -43,13 +50,15 @@ if no_cache:
 skip_env_prep = bool(args.skip_env_prep)
 skip_source_download = bool(args.skip_source_download)
 skip_ext_install = bool(args.skip_ext_install)
-skip_build = bool(args.skip_build)
+skip_bin_build = bool(args.skip_bin_build)
+skip_website_gen = bool(args.skip_website_gen)
+skip_website_build = bool(args.skip_website_build)
+build_website_only = bool(args.build_website_only)
 
 cwd = config_path.parent / config.name
 logger.debug(f"Current working directory: {cwd} (source code directory will be "
              f"downloaded here)")
 cwd.mkdir(parents=True, exist_ok=True)
-
 # pxt target arcade
 if skip_env_prep:
     logger.info("Skipping environment preparation")
@@ -80,7 +89,7 @@ else:
 
 # pxt build
 binary_js_path = source_code_path / "built" / "debug" / "binary.js"
-if skip_build:
+if skip_bin_build:
     logger.info("Skipping build")
 else:
     logger.info("Building project")
@@ -92,3 +101,31 @@ else:
     run_shell_command("pxt build", cwd=source_code_path)
 
 logger.debug(f"Binary JS path: {binary_js_path}")
+
+# yarn create vite, copy files, and substitute values
+vite_project_name = f"{config.name.lower().replace(" ", "-")}-website"
+website_path = cwd / vite_project_name
+if skip_website_gen:
+    logger.info("Skipping website generation")
+else:
+    logger.info(f"Generating TS React and Vite website")
+    if no_cache:
+        logger.debug("Checking for existing website to remove")
+        delete_these([vite_project_name], cwd)
+    logger.debug(f"Creating Vite project with name {vite_project_name}")
+    generate_website(config, vite_project_name, cwd, binary_js_path)
+
+# yarn run build
+website_dist_path = website_path / "dist"
+if skip_website_build:
+    logger.info("Skipping website build")
+else:
+    logger.info("Building website")
+    run_shell_command("yarn build", cwd=website_path)
+    logger.debug(f"Website build completed. Files are in {website_dist_path}")
+
+if build_website_only:
+    logger.info("Exiting after building website")
+    logger.info(f"You can find the static files at {build_website_only}")
+    logger.info("To preview, run `yarn run preview` in that directory")
+    exit(0)

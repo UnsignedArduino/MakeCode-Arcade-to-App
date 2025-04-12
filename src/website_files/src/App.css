@@ -1,0 +1,14 @@
+body {
+  background: black;
+  overflow: hidden;
+  margin: 0
+}
+
+iframe {
+  width: 100%;
+  height: auto;
+  max-width: 100vw;
+  max-height: 100vh;
+  aspect-ratio: 4 / 3;
+  border: none;
+}
