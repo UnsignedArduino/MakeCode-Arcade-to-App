@@ -1,4 +1,4 @@
-# Configuration file for MakeCode Arcade to App to compile to an executable
+# Example configuration file for MakeCode Arcade to App to compile to an executable
 
 name: Racers
 description: "Enjoy the high-speed thrills of car racing in MakeCode Arcade! 
@@ -19,3 +19,9 @@ source: https://arcade.makecode.com/84426-33815-03715-00484
 # Game icon - this will be the icon of the tab or executable
 # Either absolute path to a file, a relative path from this file, or a URL
 icon: Racers icon.png
+
+# Output format - whether to output static files, an Electron app, or a Tauri app.
+# Currently only static files output is supported.
+output: static
+# output: electron
+# output: tauri

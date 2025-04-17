@@ -15,13 +15,14 @@ from utils.logger import create_logger
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def generate_website(config: Config, prj_name: str, cwd: Path, bin_js_path: Path):
+def generate_website(config: Config, prj_name: str, src_dir: Path, cwd: Path, bin_js_path: Path):
     """
     Generate the website by initializing a React TS Vite project, copying the necessary
     files, and substituting the correct values in.
 
     :param config: The configuration object containing the project information.
     :param prj_name: The name of the project.
+    :param src_dir: The source directory where the project files are located.
     :param cwd: The current working directory where the project will be created.
     :param bin_js_path: The path to the binary.js file.
     """
@@ -32,7 +33,7 @@ def generate_website(config: Config, prj_name: str, cwd: Path, bin_js_path: Path
     else:
         run_shell_command(f"yarn create vite {prj_name} -t react-ts", cwd=cwd)
     # Start copying files
-    old_dir = Path.cwd() / "website_files"
+    old_dir = src_dir / "website_files"
     new_dir = cwd / prj_name
 
     def copy_template(file_name: str, callback: Callable[[str], str] = lambda x: x):

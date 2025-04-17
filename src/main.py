@@ -2,7 +2,7 @@ import logging
 from argparse import ArgumentParser
 from pathlib import Path
 
-from mkcd_to_app.config import parse_config
+from mkcd_to_app.config import parse_config, OutputType
 from mkcd_to_app.source import download_source
 from mkcd_to_app.website import generate_website
 from utils.cmd import run_shell_command
@@ -30,8 +30,6 @@ parser.add_argument("--skip-website-gen", action="store_true",
                     help="Skip website generation. This is useful for debugging.")
 parser.add_argument("--skip-website-build", action="store_true",
                     help="Skip building the website. This is useful for debugging.")
-parser.add_argument("--build-website-only", action="store_true",
-                    help="Build the website to static files only.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -44,6 +42,9 @@ config_path = Path(args.config_path)
 logger.info(f"Loading configuration from {config_path}")
 config = parse_config(config_path.read_text(), config_path.parent)
 
+output_format = config.output
+logger.debug(f"Building to {output_format.value}")
+
 no_cache = bool(args.no_cache)
 if no_cache:
     logger.info("No cache option selected. Ignoring cached files.")
@@ -53,11 +54,12 @@ skip_ext_install = bool(args.skip_ext_install)
 skip_bin_build = bool(args.skip_bin_build)
 skip_website_gen = bool(args.skip_website_gen)
 skip_website_build = bool(args.skip_website_build)
-build_website_only = bool(args.build_website_only)
 
 cwd = config_path.parent / config.name
+src_dir = Path(__file__).parent
 logger.debug(f"Current working directory: {cwd} (source code directory will be "
              f"downloaded here)")
+logger.debug(f"Source code directory: {src_dir}")
 cwd.mkdir(parents=True, exist_ok=True)
 # pxt target arcade
 if skip_env_prep:
@@ -112,7 +114,7 @@ else:
         logger.debug("Checking for existing website to remove")
         delete_these([vite_project_name], cwd)
     logger.debug(f"Creating Vite project with name {vite_project_name}")
-    generate_website(config, vite_project_name, cwd, binary_js_path)
+    generate_website(config, vite_project_name, src_dir, cwd, binary_js_path)
 
 # yarn run build
 website_dist_path = website_path / "dist"
@@ -123,8 +125,8 @@ else:
     run_shell_command("yarn build", cwd=website_path)
 logger.debug(f"Static website files path: {website_dist_path}")
 
-if build_website_only:
-    logger.info("Exiting after building website")
-    logger.info(f"You can find the static files at {build_website_only}")
-    logger.info("To preview, run `yarn run preview` in that directory")
+if output_format == OutputType.STATIC:
+    logger.info(f"Build finished, static website files are at {website_dist_path}")
     exit(0)
+else:
+    raise NotImplementedError(f"Output format {output_format} is not implemented yet")

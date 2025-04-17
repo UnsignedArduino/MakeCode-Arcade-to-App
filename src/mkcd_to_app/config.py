@@ -23,6 +23,12 @@ class IconSourceType(Enum):
     URL = "url"
 
 
+class OutputType(Enum):
+    STATIC = "static"
+    ELECTRON = "electron"
+    TAURI = "tauri"
+
+
 @dataclass
 class Config:
     """
@@ -39,6 +45,8 @@ class Config:
 
     icon: Optional[Path | str] = None
     icon_source_type: Optional[IconSourceType] = None
+
+    output: OutputType = OutputType.STATIC
 
 
 # https://stackoverflow.com/a/36283503/10291933
@@ -117,7 +125,8 @@ def parse_config(yaml_text: str, cwd: Path) -> Config:
         source_type=src_type,
         source_checkout=src_checkout,
         icon=icon,
-        icon_source_type=icon_source_type
+        icon_source_type=icon_source_type,
+        output=OutputType(result.get("output", "static").lower())
     )
     logger.debug(f"Parsed configuration: {config}")
     return config
