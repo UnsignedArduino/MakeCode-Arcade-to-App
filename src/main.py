@@ -115,7 +115,7 @@ else:
         logger.debug("Checking for existing website to remove")
         delete_these([vite_project_name], cwd)
     logger.debug(f"Creating Vite project with name {vite_project_name}")
-    generate_website(config, vite_project_name, src_dir, cwd, binary_js_path)
+    generate_website(config, vite_project_name, src_dir / "templates" / "website_files", cwd, binary_js_path)
 
 # yarn run build
 website_dist_path = website_path / "dist"
@@ -130,6 +130,7 @@ if output_format == OutputType.STATIC:
     logger.info(f"Build finished")
     exit(0)
 elif output_format == OutputType.ELECTRON:
+    # npx create-electron-app@latest, copy files, and substitute values
     # python src/main.py examples/Racers.yaml --skip-env-prep --skip-source-download --skip-ext-install --skip-bin-build --skip-website-gen --skip-website-build --debug
     logger.info(f"Generating Electron app")
     logger.debug(f"Creating Electron app in {cwd}, using {website_dist_path} for source")
@@ -137,6 +138,6 @@ elif output_format == OutputType.ELECTRON:
     electron_path = cwd / electron_project_name
     logger.debug(f"Creating Electron project with name {electron_project_name}")
     # TODO: Check for no_cache and delete stuff
-    generate_electron(config, electron_project_name, website_dist_path, cwd)
+    generate_electron(config, electron_project_name, src_dir / "templates" / "electron_files", website_dist_path, cwd)
 elif output_format == OutputType.TAURI:
     raise NotImplementedError("Tauri is not yet implemented")
