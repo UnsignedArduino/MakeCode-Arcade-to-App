@@ -8,7 +8,7 @@ import requests
 from PIL import Image
 from bs4 import BeautifulSoup
 
-from mkcd_to_app.config import Config, IconSourceType, SourceType
+from convert.mkcd_to_website.config import Config, IconSourceType, SourceType
 from utils.cmd import run_shell_command
 from utils.logger import create_logger
 
@@ -33,7 +33,7 @@ def generate_website(config: Config, prj_name: str, src_dir: Path, cwd: Path, bi
     else:
         run_shell_command(f"yarn create vite {prj_name} -t react-ts", cwd=cwd)
     # Start copying files
-    old_dir = src_dir / "website_files"
+    old_dir = src_dir / "templates" / "website_files"
     new_dir = cwd / prj_name
 
     def copy_template(file_name: str, callback: Callable[[str], str] = lambda x: x):

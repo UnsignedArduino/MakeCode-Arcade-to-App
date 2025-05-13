@@ -4,7 +4,7 @@ import {
   createEmptyLoadingToastCallbacks,
   loadingToast,
     type LoadingToastCallbacks,
-} from "./utils/toasts";
+} from "./utils/toasts.ts";
 import { toast } from "react-toastify";
 import { GameConfiguration } from "./gameConfiguration.ts";
 import { positionFixedElement } from "./utils/position.ts";

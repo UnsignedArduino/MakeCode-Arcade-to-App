@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from mkcd_to_app.config import Config, SourceType
+from convert.mkcd_to_website.config import Config, SourceType
 from utils.cmd import run_command, run_shell_command
 from utils.logger import create_logger
 

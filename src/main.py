@@ -2,10 +2,10 @@ import logging
 from argparse import ArgumentParser
 from pathlib import Path
 
-from app_to_electron.electron import generate_electron
-from mkcd_to_app.config import parse_config, OutputType
-from mkcd_to_app.source import download_source
-from mkcd_to_app.website import generate_website
+from convert.website_to_electron.electron import generate_electron
+from convert.mkcd_to_website.config import parse_config, OutputType
+from convert.mkcd_to_website.source import download_source
+from convert.mkcd_to_website.website import generate_website
 from utils.cmd import run_shell_command
 from utils.filesystem import delete_these
 from utils.logger import create_logger, set_all_stdout_logger_levels
