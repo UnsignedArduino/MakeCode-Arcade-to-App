@@ -2,6 +2,7 @@ import logging
 from argparse import ArgumentParser
 from pathlib import Path
 
+from app_to_electron.electron import generate_electron
 from mkcd_to_app.config import parse_config, OutputType
 from mkcd_to_app.source import download_source
 from mkcd_to_app.website import generate_website
@@ -135,6 +136,6 @@ elif output_format == OutputType.ELECTRON:
     electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
     electron_path = cwd / electron_project_name
     logger.debug(f"Creating Electron project with name {electron_project_name}")
-    # npx --yes create-electron-app@latest {electron_project_name} --template=webpack
+    generate_electron(config, electron_project_name, website_dist_path, cwd)
 elif output_format == OutputType.TAURI:
     raise NotImplementedError("Tauri is not yet implemented")
