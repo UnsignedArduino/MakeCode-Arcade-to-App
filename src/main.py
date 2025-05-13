@@ -62,7 +62,7 @@ logger.debug(f"Current working directory: {cwd} (source code directory will be "
              f"downloaded here)")
 logger.debug(f"Source code directory: {src_dir}")
 cwd.mkdir(parents=True, exist_ok=True)
-# pxt target arcade
+# npx pxt target arcade
 if skip_env_prep:
     logger.info("Skipping environment preparation")
 else:
@@ -70,7 +70,7 @@ else:
     if no_cache:
         logger.debug("Checking for existing environment to remove")
         delete_these(["node_modules", "package.json", "package-lock.json"], cwd)
-    run_shell_command("pxt target arcade", cwd=cwd)
+    run_shell_command("npx pxt target arcade", cwd=cwd)
 
 # Download source code
 if skip_source_download:
@@ -80,17 +80,17 @@ else:
     logger.info("Downloading source code")
     source_code_path = download_source(config, cwd, no_cache)
 
-# pxt install
+# npx pxt install
 if skip_ext_install:
     logger.info("Skipping extension installation")
 else:
     logger.info("Installing extensions")
     if no_cache:
         logger.debug("Cleaning")
-        run_shell_command("pxt clean", cwd=source_code_path)
-    run_shell_command("pxt install", cwd=source_code_path)
+        run_shell_command("npx pxt clean", cwd=source_code_path)
+    run_shell_command("npx pxt install", cwd=source_code_path)
 
-# pxt build
+# npx pxt build
 binary_js_path = source_code_path / "built" / "debug" / "binary.js"
 if skip_bin_build:
     logger.info("Skipping build")
@@ -101,7 +101,7 @@ else:
         if binary_js_path.exists():
             logger.debug(f"Deleting {binary_js_path}")
             binary_js_path.unlink()
-    run_shell_command("pxt build", cwd=source_code_path)
+    run_shell_command("npx pxt build", cwd=source_code_path)
 logger.debug(f"Binary JS path: {binary_js_path}")
 
 # yarn create vite, copy files, and substitute values

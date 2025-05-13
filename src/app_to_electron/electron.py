@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from mkcd_to_app.config import Config
 from utils.cmd import run_shell_command
@@ -22,4 +23,4 @@ def generate_electron(config: Config, prj_name: str, dist_dir: Path, cwd: Path):
     if (cwd / prj_name).exists():
         logger.debug(f"Project {prj_name} already exists, continuing...")
     else:
-        run_shell_command(f"npx --yes create-electron-app {prj_name} --template=typescript", cwd=cwd)
+        run_shell_command(f"npx --yes create-electron-app@latest {prj_name} --template=webpack", cwd=cwd)
