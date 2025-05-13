@@ -1,4 +1,4 @@
-import { ToastPosition } from "react-toastify";
+import type { ToastPosition } from "react-toastify";
 
 export function positionFixedElement(ele: HTMLElement, pos: ToastPosition) {
   switch (pos) {

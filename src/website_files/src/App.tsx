@@ -3,7 +3,7 @@ import * as React from "react";
 import {
   createEmptyLoadingToastCallbacks,
   loadingToast,
-  LoadingToastCallbacks,
+    type LoadingToastCallbacks,
 } from "./utils/toasts";
 import { toast } from "react-toastify";
 import { GameConfiguration } from "./gameConfiguration.ts";

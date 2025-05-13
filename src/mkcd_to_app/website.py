@@ -69,7 +69,9 @@ def generate_website(config: Config, prj_name: str, src_dir: Path, cwd: Path, bi
     copy_template("README.md",
                   lambda x: x.format(WEBSITE_NAME=prj_name,
                                      SOURCE=f"{config.source} @ {config.source_checkout}" if config.source_type == SourceType.GITHUB else config.source))
-    # Copy .prettierignore
+    # Copy .prettierignore, tsconfig.json, etc.
+    for file_name in (".prettierignore", "tsconfig.json", "tsconfig.app.json", "tsconfig.node.json"):
+        copy_template(file_name)
     copy_template(".prettierignore")
     # yarn
     run_shell_command("yarn", cwd=new_dir)

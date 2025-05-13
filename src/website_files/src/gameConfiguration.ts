@@ -1,4 +1,4 @@
-import { Theme, ToastPosition } from "react-toastify";
+import type { Theme, ToastPosition } from "react-toastify";
 
 /* eslint-disable @typescript-eslint/no-namespace */
 export namespace GameConfiguration {
