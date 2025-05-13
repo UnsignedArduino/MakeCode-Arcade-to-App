@@ -22,6 +22,7 @@ function App(): React.ReactNode {
     createEmptyLoadingToastCallbacks(),
   );
   const [showNoFocusMessage, setShowNoFocusMessage] = React.useState(false);
+  const [statsInnerText, setStatsInnerText] = React.useState("");
 
   React.useEffect(() => {
     try {
@@ -227,6 +228,7 @@ function App(): React.ReactNode {
           statsRef.current,
           GameConfiguration.DebugStats.STATS_LOCATION,
         );
+        setStatsInnerText(statsText ?? "")
         statsRef.current.innerText = statsText ?? "";
       }
     }, 100);
@@ -303,8 +305,11 @@ function App(): React.ReactNode {
           padding: GameConfiguration.DebugStats.STATS_PADDING,
           zIndex: 1000,
         }}
-        hidden={!GameConfiguration.DebugStats.SHOW_STATS}
-      />
+        hidden={!GameConfiguration.DebugStats.SHOW_STATS ||
+            statsInnerText.length === 0}
+      >
+        {statsInnerText}
+      </div>
     </div>
   );
 }
