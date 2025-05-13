@@ -72,7 +72,6 @@ def generate_website(config: Config, prj_name: str, src_dir: Path, cwd: Path, bi
     # Copy .prettierignore, tsconfig.json, etc.
     for file_name in (".prettierignore", "tsconfig.json", "tsconfig.app.json", "tsconfig.node.json"):
         copy_template(file_name)
-    copy_template(".prettierignore")
     # yarn
     run_shell_command("yarn", cwd=new_dir)
     # yarn add stuff
