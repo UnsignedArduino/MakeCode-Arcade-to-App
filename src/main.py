@@ -31,6 +31,8 @@ parser.add_argument("--skip-website-gen", action="store_true",
                     help="Skip website generation. This is useful for debugging.")
 parser.add_argument("--skip-website-build", action="store_true",
                     help="Skip building the website. This is useful for debugging.")
+parser.add_argument("--skip-electron-gen", action="store_true",
+                    help="Skip Electron app generation. This is useful for debugging.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -55,6 +57,7 @@ skip_ext_install = bool(args.skip_ext_install)
 skip_bin_build = bool(args.skip_bin_build)
 skip_website_gen = bool(args.skip_website_gen)
 skip_website_build = bool(args.skip_website_build)
+skip_electron_gen = bool(args.skip_electron_gen)
 
 cwd = config_path.parent / config.name
 src_dir = Path(__file__).parent
@@ -130,14 +133,19 @@ if output_format == OutputType.STATIC:
     logger.info(f"Build finished")
     exit(0)
 elif output_format == OutputType.ELECTRON:
-    # npx create-electron-app@latest, copy files, and substitute values
     # python src/main.py examples/Racers.yaml --skip-env-prep --skip-source-download --skip-ext-install --skip-bin-build --skip-website-gen --skip-website-build --debug
-    logger.info(f"Generating Electron app")
+    if skip_electron_gen:
+        logger.info("Skipping Electron app generation")
+    else:
+        logger.info(f"Generating Electron app")
     logger.debug(f"Creating Electron app in {cwd}, using {website_dist_path} for source")
     electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
     electron_path = cwd / electron_project_name
     logger.debug(f"Creating Electron project with name {electron_project_name}")
-    # TODO: Check for no_cache and delete stuff
+    # npx create-electron-app@latest, copy files, and substitute values
+    if no_cache:
+        logger.debug("Checking for existing website to remove")
+        delete_these([electron_project_name], cwd)
     generate_electron(config, electron_project_name, src_dir / "templates" / "electron_files", website_dist_path, cwd)
 elif output_format == OutputType.TAURI:
     raise NotImplementedError("Tauri is not yet implemented")
