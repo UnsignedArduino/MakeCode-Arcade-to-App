@@ -24,3 +24,9 @@ def generate_electron(config: Config, prj_name: str, dist_dir: Path, cwd: Path):
         logger.debug(f"Project {prj_name} already exists, continuing...")
     else:
         run_shell_command(f"npx --yes create-electron-app@latest {prj_name} --template=webpack", cwd=cwd)
+    # Start copying files
+    old_dir = dist_dir
+    new_dir = cwd / prj_name / "src"
+    logger.debug(f"Copying HTML, CSS, and JS from {old_dir} to {new_dir}")
+    # Copy all files in old_dir to new_dir
+    

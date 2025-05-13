@@ -136,6 +136,7 @@ elif output_format == OutputType.ELECTRON:
     electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
     electron_path = cwd / electron_project_name
     logger.debug(f"Creating Electron project with name {electron_project_name}")
+    # TODO: Check for no_cache and delete stuff
     generate_electron(config, electron_project_name, website_dist_path, cwd)
 elif output_format == OutputType.TAURI:
     raise NotImplementedError("Tauri is not yet implemented")
