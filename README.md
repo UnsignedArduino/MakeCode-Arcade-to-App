@@ -12,4 +12,4 @@ Convert your MakeCode Arcade games into a standalone offline executable!
 
 1. Clone repo. 
 2. Create virtual environment and install Python dependencies in [`requirements.txt`](requirements.txt) into it. 
-3. Install JavaScript dependencies with `npm install`.
+3. Install JavaScript dependencies with `yarn`.
