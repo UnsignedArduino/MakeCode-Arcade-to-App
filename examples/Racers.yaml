@@ -22,6 +22,6 @@ icon: Racers icon.png
 
 # Output format - whether to output static files, an Electron app, or a Tauri app.
 # Currently only static files output is supported.
-output: static
-# output: electron
+# output: static
+output: electron
 # output: tauri

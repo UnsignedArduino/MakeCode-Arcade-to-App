@@ -123,10 +123,18 @@ if skip_website_build:
 else:
     logger.info("Building website")
     run_shell_command("yarn build", cwd=website_path)
-logger.debug(f"Static website files path: {website_dist_path}")
 
+logger.info(f"Static website files are at {website_dist_path}")
 if output_format == OutputType.STATIC:
-    logger.info(f"Build finished, static website files are at {website_dist_path}")
+    logger.info(f"Build finished")
     exit(0)
-else:
-    raise NotImplementedError(f"Output format {output_format} is not implemented yet")
+elif output_format == OutputType.ELECTRON:
+    # python src/main.py examples/Racers.yaml --skip-env-prep --skip-source-download --skip-ext-install --skip-bin-build --skip-website-gen --skip-website-build --debug
+    logger.info(f"Generating Electron app")
+    logger.debug(f"Creating Electron app in {cwd}, using {website_dist_path} for source")
+    electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
+    electron_path = cwd / electron_project_name
+    logger.debug(f"Creating Electron project with name {electron_project_name}")
+    # npx --yes create-electron-app@latest {electron_project_name} --template=webpack
+elif output_format == OutputType.TAURI:
+    raise NotImplementedError("Tauri is not yet implemented")
