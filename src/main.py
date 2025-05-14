@@ -2,10 +2,10 @@ import logging
 from argparse import ArgumentParser
 from pathlib import Path
 
-from convert.website_to_electron.electron import generate_electron
-from convert.mkcd_to_website.config import parse_config, OutputType
+from convert.mkcd_to_website.config import OutputType, parse_config
 from convert.mkcd_to_website.source import download_source
 from convert.mkcd_to_website.website import generate_website
+from convert.website_to_electron.electron import generate_electron
 from utils.cmd import run_shell_command
 from utils.filesystem import delete_these
 from utils.logger import create_logger, set_all_stdout_logger_levels
@@ -118,7 +118,8 @@ else:
         logger.debug("Checking for existing website to remove")
         delete_these([vite_project_name], cwd)
     logger.debug(f"Creating Vite project with name {vite_project_name}")
-    generate_website(config, vite_project_name, src_dir / "templates" / "website_files", cwd, binary_js_path)
+    generate_website(config, vite_project_name, src_dir / "templates" / "website_files",
+                     cwd, binary_js_path)
 
 # yarn run build
 website_dist_path = website_path / "dist"
@@ -133,19 +134,21 @@ if output_format == OutputType.STATIC:
     logger.info(f"Build finished")
     exit(0)
 elif output_format == OutputType.ELECTRON:
-    # python src/main.py examples/Racers.yaml --skip-env-prep --skip-source-download --skip-ext-install --skip-bin-build --skip-website-gen --skip-website-build --debug
     if skip_electron_gen:
         logger.info("Skipping Electron app generation")
     else:
         logger.info(f"Generating Electron app")
-    logger.debug(f"Creating Electron app in {cwd}, using {website_dist_path} for source")
-    electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
-    electron_path = cwd / electron_project_name
-    logger.debug(f"Creating Electron project with name {electron_project_name}")
-    # npx create-electron-app@latest, copy files, and substitute values
-    if no_cache:
-        logger.debug("Checking for existing website to remove")
-        delete_these([electron_project_name], cwd)
-    generate_electron(config, electron_project_name, src_dir / "templates" / "electron_files", website_dist_path, cwd)
+        logger.debug(
+            f"Creating Electron app in {cwd}, using {website_dist_path} for source")
+        electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
+        electron_path = cwd / electron_project_name
+        logger.debug(f"Creating Electron project with name {electron_project_name}")
+        # npx create-electron-app@latest, copy files, and substitute values
+        if no_cache:
+            logger.debug("Checking for existing website to remove")
+            delete_these([electron_project_name], cwd)
+        generate_electron(config, electron_project_name,
+                          src_dir / "templates" / "electron_files", website_dist_path,
+                          cwd)
 elif output_format == OutputType.TAURI:
     raise NotImplementedError("Tauri is not yet implemented")

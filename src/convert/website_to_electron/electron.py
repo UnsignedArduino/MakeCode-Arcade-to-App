@@ -11,7 +11,8 @@ from utils.logger import create_logger
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_dir: Path, cwd: Path):
+def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_dir: Path,
+                      cwd: Path):
     """
     Generate the Electron app from static HTML, CSS, and JS files. Assumes index.html
     is the entry point.
@@ -29,7 +30,9 @@ def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_di
     if prj_dir.exists():
         logger.debug(f"Project {prj_name} already exists, continuing...")
     else:
-        run_shell_command(f"npx --yes create-electron-app@latest {prj_name} --template=webpack", cwd=cwd)
+        run_shell_command(
+            f"npx --yes create-electron-app@latest {prj_name} --template=webpack",
+            cwd=cwd)
     delete_these(["package-lock.json"], prj_dir)
     delete_these(["index.html", "index.css"], prj_src_dir)
     # Start copying files from template
@@ -53,9 +56,15 @@ def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_di
                   lambda x: x.format(WEBSITE_NAME=prj_name,
                                      SOURCE=f"{config.source} @ {config.source_checkout}" if config.source_type == SourceType.GITHUB else config.source))
     # Copy forge.config.js, webpack.main.config.js, etc.
-    for file_name in ("forge.config.js", "webpack.main.config.js", "webpack.renderer.config.js", "webpack.rules.js"):
+    for file_name in ("forge.config.js", "webpack.main.config.js",
+                      "webpack.renderer.config.js", "webpack.rules.js"):
         copy_template(file_name)
+    # Copy src directory
+    copy_these(list([p.name for p in (old_dir / "src").glob("*")]), old_dir / "src",
+               prj_dir / "src")
+    # Copy dist directory
+    static_dir = prj_src_dir / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    copy_these(list([p.name for p in dist_dir.glob("*")]), dist_dir, static_dir)
     # yarn
     run_shell_command("yarn", cwd=new_dir)
-    # Copy dist directory
-    copy_these(list([p.name for p in dist_dir.glob("*")]), dist_dir, prj_src_dir)
