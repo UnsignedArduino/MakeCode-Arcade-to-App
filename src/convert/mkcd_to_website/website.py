@@ -15,7 +15,8 @@ from utils.logger import create_logger
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Path, bin_js_path: Path):
+def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Path,
+                     bin_js_path: Path):
     """
     Generate the website by initializing a React TS Vite project, copying the necessary
     files, and substituting the correct values in.
@@ -67,8 +68,10 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
     copy_template("README.md",
                   lambda x: x.format(WEBSITE_NAME=prj_name,
                                      SOURCE=f"{config.source} @ {config.source_checkout}" if config.source_type == SourceType.GITHUB else config.source))
-    # Copy eslint.config.js, .prettierignore, tsconfig.json, etc.
-    for file_name in ("eslint.config.js", ".prettierignore", "tsconfig.json", "tsconfig.app.json", "tsconfig.node.json"):
+    # Copy more files
+    for file_name in ("vite.config.ts", "eslint.config.js", ".prettierignore",
+                      "tsconfig.json",
+                      "tsconfig.app.json", "tsconfig.node.json"):
         copy_template(file_name)
     # yarn
     run_shell_command("yarn", cwd=new_dir)
@@ -98,7 +101,7 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
         raise Exception(f"Failed to download simulator: {res.status_code} {res.reason}")
     # Analyze simulator HTML for required CSS and JS files
     logger.debug("Analyzing simulator HTML for required CSS and JS files")
-    soup = BeautifulSoup(sim_html)
+    soup = BeautifulSoup(sim_html, features="html.parser")
     css_links = soup.find_all("link", rel="stylesheet")
     js_scripts = soup.find_all("script")
     logger.debug(f"Found {len(css_links)} CSS links and {len(js_scripts)} JS scripts")
@@ -108,10 +111,11 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
             logger.debug(f"Downloading CSS file: {css_url}")
             res = requests.get(css_url)
             if res.ok:
+                file_name = css_url.split("/")[-1]
                 # Download CSS file
-                (new_dir / "public" / css_url.split("/")[-1]).write_text(res.text)
+                (new_dir / "public" / file_name).write_text(res.text)
                 # Rewrite CSS file to use relative paths
-                css["href"] = css_url.split("/")[-1]
+                css["href"] = f"./{file_name}"
             else:
                 raise Exception(
                     f"Failed to download CSS file: {res.status_code} {res.reason}")
@@ -121,10 +125,11 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
             logger.debug(f"Downloading JS file: {js_url}")
             res = requests.get(js_url)
             if res.ok:
+                file_name = js_url.split("/")[-1]
                 # Download JS file
-                (new_dir / "public" / js_url.split("/")[-1]).write_text(res.text)
+                (new_dir / "public" / file_name).write_text(res.text)
                 # Rewrite JS file to use relative paths
-                js["src"] = js_url.split("/")[-1]
+                js["src"] = f"./{file_name}"
             else:
                 raise Exception(
                     f"Failed to download JS file: {res.status_code} {res.reason}")

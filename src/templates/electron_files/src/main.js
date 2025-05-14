@@ -40,28 +40,6 @@ app.whenReady().then(() => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();
         }
-
-    });
-
-    protocol.handle("http", (rq) => {
-        const u = new URL(rq.url);
-        const file = (() => {
-            let r = u.pathname.replace("/main_window", "");
-            if (r.startsWith("/")) {
-                r = r.slice(1);
-            }
-            return r;
-        })();
-        const static_dir = path.join(__dirname, "static");
-        const file_path = path.join(static_dir, file);
-        if (fs.existsSync(file_path)) {
-            const newURL = url.pathToFileURL(file_path);
-            console.log(`Requested ${file}, serving ${newURL}`);
-            return net.fetch(newURL.toString(), {bypassCustomProtocolHandlers: true});
-        } else {
-            console.log(`Requested ${file}, passing to net`);
-            return net.fetch(rq, {bypassCustomProtocolHandlers: true});
-        }
     });
 });
 
