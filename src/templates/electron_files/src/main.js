@@ -41,6 +41,22 @@ app.whenReady().then(() => {
             createWindow();
         }
     });
+
+    console.log("Will intercept file requests for binary.js");
+    console.log(`process.resourcesPath: ${process.resourcesPath}`);
+    protocol.handle('file', (rq) => {
+        const u = new URL(rq.url);
+        const filePath = u.pathname;
+        if (filePath.endsWith("binary.js")) {
+            const newPath = path.join(process.resourcesPath, "binary.js");
+            const newURL = url.pathToFileURL(newPath);
+            console.log(`Requested for ${filePath}, serving ${newURL} instead`);
+            return net.fetch(newURL.toString(), {bypassCustomProtocolHandlers: true});
+        } else {
+            console.log(`Requested for ${filePath}`);
+            return net.fetch(rq, {bypassCustomProtocolHandlers: true});
+        }
+    });
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
