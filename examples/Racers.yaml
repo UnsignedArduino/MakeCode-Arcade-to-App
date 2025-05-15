@@ -21,7 +21,7 @@ source: https://arcade.makecode.com/84426-33815-03715-00484
 icon: Racers icon.png
 
 # Output format - whether to output static files, an Electron app, or a Tauri app.
-# Currently only static files output is supported.
+# Tauri output is not supported yet.
 # output: static
 output: electron
 # output: tauri

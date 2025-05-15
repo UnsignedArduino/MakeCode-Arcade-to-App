@@ -33,6 +33,8 @@ parser.add_argument("--skip-website-build", action="store_true",
                     help="Skip building the website. This is useful for debugging.")
 parser.add_argument("--skip-electron-gen", action="store_true",
                     help="Skip Electron app generation. This is useful for debugging.")
+parser.add_argument("--skip-electron-build", action="store_true",
+                    help="Skip building the Electron app. This is useful for debugging.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -58,6 +60,7 @@ skip_bin_build = bool(args.skip_bin_build)
 skip_website_gen = bool(args.skip_website_gen)
 skip_website_build = bool(args.skip_website_build)
 skip_electron_gen = bool(args.skip_electron_gen)
+skip_electron_build = bool(args.skip_electron_build)
 
 cwd = config_path.parent / config.name
 src_dir = Path(__file__).parent
@@ -134,14 +137,14 @@ if output_format == OutputType.STATIC:
     logger.info(f"Build finished")
     exit(0)
 elif output_format == OutputType.ELECTRON:
+    electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
+    electron_path = cwd / electron_project_name
     if skip_electron_gen:
         logger.info("Skipping Electron app generation")
     else:
         logger.info(f"Generating Electron app")
         logger.debug(
             f"Creating Electron app in {cwd}, using {website_dist_path} for source")
-        electron_project_name = f"{config.name.lower().replace(" ", "-")}-electron"
-        electron_path = cwd / electron_project_name
         logger.debug(f"Creating Electron project with name {electron_project_name}")
         # npx create-electron-app@latest, copy files, and substitute values
         if no_cache:
@@ -150,5 +153,17 @@ elif output_format == OutputType.ELECTRON:
         generate_electron(config, electron_project_name,
                           src_dir / "templates" / "electron_files", website_dist_path,
                           cwd)
+
+    # yarn run make
+    electron_dist_path = electron_path / "out"
+    if skip_electron_build:
+        logger.info("Skipping Electron app build")
+    else:
+        logger.info("Building Electron app")
+        run_shell_command("yarn run make", cwd=electron_path)
+
+    logger.info(f"Electron app executables are at {electron_dist_path}")
+    logger.info(f"Build finished")
+    exit(0)
 elif output_format == OutputType.TAURI:
     raise NotImplementedError("Tauri is not yet implemented")
