@@ -1,14 +1,64 @@
 import json
 import logging
+import shutil
+from io import BytesIO
 from pathlib import Path
 from typing import Callable
 
-from convert.mkcd_to_website.config import Config, SourceType
+import requests
+from PIL import Image
+
+from convert.mkcd_to_website.config import Config, IconSourceType, SourceType
 from utils.cmd import run_shell_command
 from utils.filesystem import copy_these, delete_these
 from utils.logger import create_logger
 
 logger = create_logger(name=__name__, level=logging.INFO)
+
+
+def get_icon(config: Config, src_dir: Path):
+    """
+    Prepares the icon for the Electron app. If the icon is a URL, it downloads the icon
+    and saves it to the specified path. If the icon is a local file, it copies the file
+    to the specified path. Then it will convert it to ICO for Windows, ICNS for Mac, and
+    PNG for Linux.
+
+    :param config: The configuration object containing the project information.
+    :param src_dir: The src directory of the Electron app - the icon will be saved here.
+    """
+    if config.icon is None:
+        logger.debug("No icon specified, skipping icon generation.")
+        return
+    logger.debug(f"Preparing icon")
+    icon_dir = src_dir / "assets" / "icons"
+    icon_dir.mkdir(parents=True, exist_ok=True)
+    if config.icon_source_type == IconSourceType.PATH:
+        path = Path(config.icon)
+        source_icon_path = icon_dir / f"source{path.suffix}"
+        logger.debug(f"Copying icon from {path} to {source_icon_path}")
+        shutil.copy(path, source_icon_path)
+    else:
+        url = config.icon
+        logger.debug(f"Downloading icon from {url}")
+        res = requests.get(url)
+        if not res.ok:
+            logger.error(f"Failed to download icon from {url}")
+            raise Exception(f"Failed to download icon from {url}")
+        buffer = BytesIO(res.content)
+        logger.debug(
+            f"Downloaded image size {round(buffer.getbuffer().nbytes / 1024)} kb")
+        img = Image.open(buffer)
+        source_icon_path = icon_dir / f"source.png"
+        img.save(source_icon_path)
+        logger.debug(f"Saved icon to {source_icon_path}")
+
+    formats = ["ico", "icns", "png"]
+    source_img = Image.open(source_icon_path)
+    for format in formats:
+        icon_path = icon_dir / f"icon.{format}"
+        logger.debug(f"Converting icon to {format} and saving to {icon_path}")
+        source_img.save(icon_path, format=format.upper(),
+                        sizes=[(256, 256)] if format == "ico" else None)
 
 
 def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_dir: Path,
@@ -66,5 +116,7 @@ def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_di
     static_dir = prj_src_dir / "static"
     static_dir.mkdir(parents=True, exist_ok=True)
     copy_these(list([p.name for p in dist_dir.glob("*")]), dist_dir, static_dir)
+    # Get icons
+    get_icon(config, prj_src_dir)
     # yarn
     run_shell_command("yarn", cwd=new_dir)
