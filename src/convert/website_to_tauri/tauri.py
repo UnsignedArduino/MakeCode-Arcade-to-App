@@ -62,7 +62,8 @@ def get_icon(config: Config, src_dir: Path):
                         sizes=[(256, 256)] if format == "ico" else None)
 
 
-def generate_tauri(config: Config, prj_name: str, template_dir: Path, dist_dir: Path, cwd: Path):
+def generate_tauri(config: Config, prj_name: str, template_dir: Path, dist_dir: Path,
+                   cwd: Path):
     """
     Generate the Tauri app from static HTML, CSS, and JS files.
 
@@ -104,17 +105,19 @@ def generate_tauri(config: Config, prj_name: str, template_dir: Path, dist_dir: 
                   lambda x: x.format(WEBSITE_NAME=prj_name,
                                      SOURCE=f"{config.source} @ {config.source_checkout}" if config.source_type == SourceType.GITHUB else config.source))
     # Copy src-tauri directory
-    copy_these(list([p.name for p in (old_dir / "src-tauri").glob("*")]), old_dir / "src-tauri",
+    copy_these(list([p.name for p in (old_dir / "src-tauri").glob("*")]),
+               old_dir / "src-tauri",
                prj_dir / "src-tauri")
     # Modify src-tauri/tauri.conf.json
     tauri_conf_json = json.loads((old_dir / "src-tauri/tauri.conf.json").read_text())
-    tauri_conf_json["productName"] = prj_name
+    tauri_conf_json["productName"] = config.title
     tauri_conf_json["version"] = config.version
     tauri_conf_json["identifier"] = f"com.{prj_name}.app"
-    tauri_conf_json["app"]["windows"][0]["title"] = prj_name
+    tauri_conf_json["app"]["windows"][0]["title"] = config.title
     tauri_conf_json["app"]["windows"][0]["width"] = 160 * 4
     tauri_conf_json["app"]["windows"][0]["height"] = 120 * 4
-    (new_dir / "src-tauri" / "tauri.conf.json").write_text(json.dumps(tauri_conf_json, indent=2))
+    (new_dir / "src-tauri" / "tauri.conf.json").write_text(
+        json.dumps(tauri_conf_json, indent=2))
     # Copy dist directory
     prj_src_dir.mkdir(parents=True, exist_ok=True)
     copy_these(list([p.name for p in dist_dir.glob("*")]), dist_dir, prj_src_dir)

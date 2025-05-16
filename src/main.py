@@ -54,6 +54,7 @@ config = parse_config(config_path.read_text(), config_path.parent)
 
 output_format = config.output
 logger.debug(f"Building to {output_format.value}")
+logger.debug(f"Window title will be {config.title}")
 
 no_cache = bool(args.no_cache)
 if no_cache:

@@ -5,6 +5,10 @@ description: "Enjoy the high-speed thrills of car racing in MakeCode Arcade!
   For the MakeCode Arcade Mini Game Jam #3."
 author: UnsignedArduino
 version: 1.3.2
+# This is what the window title will be
+# This will also be used for the executable file name for Electron outputs
+# You can use {NAME} or {VERSION} or {AUTHOR} to substitute the correct values
+title: "{NAME} v{VERSION}"
 
 # Game source - where the game code is located - this will download / copy everything
 # Can be a GitHub repository (.git ending is optional) that specifies something to check out,

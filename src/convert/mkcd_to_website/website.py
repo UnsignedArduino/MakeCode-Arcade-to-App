@@ -42,10 +42,8 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
         (new_dir / file_name).write_text(callback((old_dir / file_name).read_text()))
 
     logger.debug(f"Copying website files from {old_dir} to {new_dir}")
-    # Copy index.html and substituting the correct values
-    copy_template("index.html",
-                  lambda x: x.format(NAME=config.name, VERSION=config.version,
-                                     AUTHOR=config.author))
+    # Copy index.html and substitute the title
+    copy_template("index.html", lambda x: x.format(TITLE=config.title))
     # Modify package.json
     package_json = json.loads((old_dir / "package.json").read_text())
     package_json["name"] = prj_name

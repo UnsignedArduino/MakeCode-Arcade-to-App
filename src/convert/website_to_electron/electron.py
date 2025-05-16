@@ -96,7 +96,7 @@ def generate_electron(config: Config, prj_name: str, template_dir: Path, dist_di
     # Modify package.json
     package_json = json.loads((old_dir / "package.json").read_text())
     package_json["name"] = prj_name
-    package_json["productName"] = prj_name
+    package_json["productName"] = config.title
     package_json["version"] = config.version
     package_json["description"] = config.description
     package_json["author"] = config.author

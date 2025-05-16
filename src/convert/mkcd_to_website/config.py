@@ -38,6 +38,7 @@ class Config:
     description: str
     author: str
     version: str
+    title: str
 
     source: str
     source_type: SourceType
@@ -121,6 +122,7 @@ def parse_config(yaml_text: str, cwd: Path) -> Config:
         description=result.get("description"),
         author=result.get("author"),
         version=result.get("version"),
+        title=result.get("title"),
         source=src,
         source_type=src_type,
         source_checkout=src_checkout,
@@ -128,5 +130,6 @@ def parse_config(yaml_text: str, cwd: Path) -> Config:
         icon_source_type=icon_source_type,
         output=OutputType(result.get("output", "static").lower())
     )
+    config.title = config.title.format(NAME=config.name, VERSION=config.version, AUTHOR=config.author)
     logger.debug(f"Parsed configuration: {config}")
     return config
