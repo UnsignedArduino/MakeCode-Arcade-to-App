@@ -1,0 +1,27 @@
+# Example configuration file for MakeCode Arcade to App to compile to an executable
+
+name: Racers
+description: "Enjoy the high-speed thrills of car racing in MakeCode Arcade! 
+  For the MakeCode Arcade Mini Game Jam #3."
+author: UnsignedArduino
+version: 1.3.2
+
+# Game source - where the game code is located - this will download / copy everything
+# Can be a GitHub repository (.git ending is optional) that specifies something to check out,
+# a MakeCode Arcade share link, (ex. https://arcade.makecode.com/84426-33815-03715-00484)
+# or a path (ex. F:/Racers)
+#source:
+#  url: https://github.com/UnsignedArduino/Racers
+#  checkout: master  # Could be a branch, tag, commit hash, etc. (it's passed to `git checkout` directly)
+source: https://arcade.makecode.com/84426-33815-03715-00484
+#source: F:/Racers
+
+# Game icon - this will be the icon of the tab or executable
+# Either absolute path to a file, a relative path from this file, or a URL
+#icon: Racers icon.png
+icon: https://raw.githubusercontent.com/UnsignedArduino/MakeCode-Arcade-to-App/refs/heads/main/examples/Racers%20icon.png
+
+# Output format - whether to output static files, an Electron app, or a Tauri app.
+# output: static
+# output: electron
+output: tauri

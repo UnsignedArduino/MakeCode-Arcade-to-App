@@ -6,8 +6,9 @@ Convert your MakeCode Arcade games into a standalone offline executable!
 
 ### Dependencies
 
-* Python (recent version such as 3.12)
-* Node (recent version such as v20)
+* Python (tested with version 3.12)
+* Node (tested with version v20)
+* Rust if building with Tauri (tested with compiler version 1.87)
 
 ### Steps
 
@@ -18,6 +19,7 @@ Convert your MakeCode Arcade games into a standalone offline executable!
 
 ## Usage
 
-1. Create a yaml configuration file. See [`Racers.yaml`](examples/Racers.yaml)
-   for an example.
-2. Run the script with `python main.py Racers.yaml`.
+1. Create a yaml configuration file. See 
+   [`Racers to Electron.yaml`](examples/Racers%20to%20Electron.yaml) for an 
+   example.
+2. Run the script with `python main.py "examples/Racers to Electron.yaml"`.
