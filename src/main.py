@@ -38,6 +38,8 @@ parser.add_argument("--skip-electron-build", action="store_true",
                     help="Skip building the Electron app. This is useful for debugging.")
 parser.add_argument("--skip-tauri-gen", action="store_true",
                     help="Skip Tauri app generation. This is useful for debugging.")
+parser.add_argument("--skip-tauri-build", action="store_true",
+                    help="Skip building the Tauri app. This is useful for debugging.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -65,6 +67,7 @@ skip_website_build = bool(args.skip_website_build)
 skip_electron_gen = bool(args.skip_electron_gen)
 skip_electron_build = bool(args.skip_electron_build)
 skip_tauri_gen = bool(args.skip_tauri_gen)
+skip_tauri_build = bool(args.skip_tauri_build)
 
 cwd = config_path.parent / config.name
 src_dir = Path(__file__).parent
@@ -185,3 +188,15 @@ elif output_format == OutputType.TAURI:
             delete_these([tauri_project_name], cwd)
         generate_tauri(config, tauri_project_name,
                        src_dir / "templates" / "tauri_files", website_dist_path, cwd)
+
+    # yarn run tauri build
+    tauri_dist_path = tauri_path / "src-tauri" / "target" / "release"
+    if skip_tauri_build:
+        logger.info("Skipping Tauri app build")
+    else:
+        logger.info("Building Tauri app")
+        run_shell_command("yarn run tauri build", cwd=tauri_path)
+
+    logger.info(f"Tauri app executables are at {tauri_dist_path}")
+    logger.info(f"Build finished")
+    exit(0)
