@@ -6,6 +6,7 @@ from convert.mkcd_to_website.config import OutputType, parse_config
 from convert.mkcd_to_website.source import download_source
 from convert.mkcd_to_website.website import generate_website
 from convert.website_to_electron.electron import generate_electron
+from convert.website_to_tauri.tauri import generate_tauri
 from utils.cmd import run_shell_command
 from utils.filesystem import delete_these
 from utils.logger import create_logger, set_all_stdout_logger_levels
@@ -35,6 +36,8 @@ parser.add_argument("--skip-electron-gen", action="store_true",
                     help="Skip Electron app generation. This is useful for debugging.")
 parser.add_argument("--skip-electron-build", action="store_true",
                     help="Skip building the Electron app. This is useful for debugging.")
+parser.add_argument("--skip-tauri-gen", action="store_true",
+                    help="Skip Tauri app generation. This is useful for debugging.")
 parser.add_argument("--debug", action="store_true",
                     help="Enable debug logging.")
 args = parser.parse_args()
@@ -61,6 +64,7 @@ skip_website_gen = bool(args.skip_website_gen)
 skip_website_build = bool(args.skip_website_build)
 skip_electron_gen = bool(args.skip_electron_gen)
 skip_electron_build = bool(args.skip_electron_build)
+skip_tauri_gen = bool(args.skip_tauri_gen)
 
 cwd = config_path.parent / config.name
 src_dir = Path(__file__).parent
@@ -166,4 +170,18 @@ elif output_format == OutputType.ELECTRON:
     logger.info(f"Build finished")
     exit(0)
 elif output_format == OutputType.TAURI:
-    raise NotImplementedError("Tauri is not yet implemented")
+    tauri_project_name = f"{config.name.lower().replace(' ', '-')}-tauri"
+    tauri_path = cwd / tauri_project_name
+    if skip_tauri_gen:
+        logger.info("Skipping Tauri app generation")
+    else:
+        logger.info(f"Generating Tauri app")
+        logger.debug(
+            f"Creating Tauri app in {cwd}, using {website_dist_path} for source")
+        logger.debug(f"Creating Tauri project with name {tauri_project_name}")
+        # yarn create tauri-app
+        if no_cache:
+            logger.debug("Checking for existing website to remove")
+            delete_these([tauri_project_name], cwd)
+        generate_tauri(config, tauri_project_name,
+                       src_dir / "templates" / "tauri_files", website_dist_path, cwd)

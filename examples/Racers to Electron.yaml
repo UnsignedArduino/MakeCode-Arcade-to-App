@@ -22,7 +22,6 @@ source: https://arcade.makecode.com/84426-33815-03715-00484
 icon: https://raw.githubusercontent.com/UnsignedArduino/MakeCode-Arcade-to-App/refs/heads/main/examples/Racers%20icon.png
 
 # Output format - whether to output static files, an Electron app, or a Tauri app.
-# Tauri output is not supported yet.
 # output: static
 output: electron
 # output: tauri
