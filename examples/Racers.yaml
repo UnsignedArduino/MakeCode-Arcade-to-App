@@ -18,10 +18,11 @@ source: https://arcade.makecode.com/84426-33815-03715-00484
 
 # Game icon - this will be the icon of the tab or executable
 # Either absolute path to a file, a relative path from this file, or a URL
-icon: Racers icon.png
+#icon: Racers icon.png
+icon: https://raw.githubusercontent.com/UnsignedArduino/MakeCode-Arcade-to-App/refs/heads/main/examples/Racers%20icon.png
 
 # Output format - whether to output static files, an Electron app, or a Tauri app.
-# Currently only static files output is supported.
-output: static
-# output: electron
+# Tauri output is not supported yet.
+# output: static
+output: electron
 # output: tauri

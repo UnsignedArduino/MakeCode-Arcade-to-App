@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-from mkcd_to_app.config import Config, SourceType
+from convert.mkcd_to_website.config import Config, SourceType
 from utils.cmd import run_command, run_shell_command
 from utils.logger import create_logger
 
@@ -50,7 +50,7 @@ def download_source(config: Config, cwd: Path,
     elif config.source_type == SourceType.SHARE_LINK:
         logger.info(f"Downloading source from share link")
         source_code_path.mkdir(parents=True, exist_ok=True)
-        run_shell_command(f"pxt extract {config.source}", cwd=source_code_path)
+        run_shell_command(f"npx pxt extract {config.source}", cwd=source_code_path)
         # Since we're using pxt extract, we need to move the contents of the directory
         # inside source_code_path to source_code_path itself
         extract_path = None

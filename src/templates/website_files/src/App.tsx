@@ -3,11 +3,11 @@ import * as React from "react";
 import {
   createEmptyLoadingToastCallbacks,
   loadingToast,
-    type LoadingToastCallbacks,
-} from "./utils/toasts";
-import { toast } from "react-toastify";
-import { GameConfiguration } from "./gameConfiguration.ts";
-import { positionFixedElement } from "./utils/position.ts";
+  type LoadingToastCallbacks,
+} from "./utils/toasts.ts";
+import {toast} from "react-toastify";
+import {GameConfiguration} from "./gameConfiguration.ts";
+import {positionFixedElement} from "./utils/position.ts";
 
 function App(): React.ReactNode {
   const simulatorRef = React.useRef<HTMLIFrameElement>(null);
@@ -21,6 +21,8 @@ function App(): React.ReactNode {
   const restartGameToastCallbacksRef = React.useRef<LoadingToastCallbacks>(
     createEmptyLoadingToastCallbacks(),
   );
+  const gameCrashToastCloseCallbackRef = React.useRef<() => void>(() => {
+  });
   const [showNoFocusMessage, setShowNoFocusMessage] = React.useState(false);
   const [statsInnerText, setStatsInnerText] = React.useState("");
 
@@ -44,10 +46,10 @@ function App(): React.ReactNode {
     loadingGameToastCallbacksRef.current = GameConfiguration.Toasts
       .ENABLE_LOADING_GAME_TOAST
       ? loadingToast(
-          GameConfiguration.Toasts.LOADING_GAME_TOAST_PENDING_MSG,
-          GameConfiguration.Toasts.LOADING_GAME_TOAST_SUCCESS_MSG,
-          GameConfiguration.Toasts.LOADING_GAME_TOAST_ERROR_MSG,
-        )
+        GameConfiguration.Toasts.LOADING_GAME_TOAST_PENDING_MSG,
+        GameConfiguration.Toasts.LOADING_GAME_TOAST_SUCCESS_MSG,
+        GameConfiguration.Toasts.LOADING_GAME_TOAST_ERROR_MSG,
+      )
       : createEmptyLoadingToastCallbacks();
     fetch("binary.js")
       .then((res) => {
@@ -101,7 +103,7 @@ function App(): React.ReactNode {
 
     function stopSim() {
       console.log("Stopping simulator");
-      simulatorRef.current?.contentWindow?.postMessage({ type: "stop" });
+      simulatorRef.current?.contentWindow?.postMessage({type: "stop"});
     }
 
     /* eslint-disable */
@@ -122,12 +124,13 @@ function App(): React.ReactNode {
             restartGameToastCallbacksRef.current = GameConfiguration.Toasts
               .ENABLE_RESTARTING_GAME_TOAST
               ? loadingToast(
-                  GameConfiguration.Toasts.RESTARTING_GAME_TOAST_PENDING_MSG,
-                  GameConfiguration.Toasts.RESTARTING_GAME_TOAST_SUCCESS_MSG,
-                  GameConfiguration.Toasts.RESTARTING_GAME_TOAST_ERROR_MSG,
-                )
+                GameConfiguration.Toasts.RESTARTING_GAME_TOAST_PENDING_MSG,
+                GameConfiguration.Toasts.RESTARTING_GAME_TOAST_SUCCESS_MSG,
+                GameConfiguration.Toasts.RESTARTING_GAME_TOAST_ERROR_MSG,
+              )
               : createEmptyLoadingToastCallbacks();
             stopSim();
+            gameCrashToastCloseCallbackRef.current();
             setTimeout(() => {
               startSim();
               restartGameToastCallbacksRef.current.success();
@@ -159,7 +162,7 @@ function App(): React.ReactNode {
         console.error(data);
         if (GameConfiguration.Toasts.ENABLE_POSSIBLE_GAME_CRASH_TOAST) {
           toast.error(
-            ({ closeToast }) => {
+            ({closeToast}) => {
               return (
                 <div>
                   {
@@ -174,13 +177,13 @@ function App(): React.ReactNode {
                       restartGameToastCallbacksRef.current = GameConfiguration
                         .Toasts.ENABLE_RESTARTING_GAME_TOAST
                         ? loadingToast(
-                            GameConfiguration.Toasts
-                              .RESTARTING_GAME_TOAST_PENDING_MSG,
-                            GameConfiguration.Toasts
-                              .RESTARTING_GAME_TOAST_SUCCESS_MSG,
-                            GameConfiguration.Toasts
-                              .RESTARTING_GAME_TOAST_ERROR_MSG,
-                          )
+                          GameConfiguration.Toasts
+                            .RESTARTING_GAME_TOAST_PENDING_MSG,
+                          GameConfiguration.Toasts
+                            .RESTARTING_GAME_TOAST_SUCCESS_MSG,
+                          GameConfiguration.Toasts
+                            .RESTARTING_GAME_TOAST_ERROR_MSG,
+                        )
                         : createEmptyLoadingToastCallbacks();
                       stopSim();
                       setTimeout(() => {
@@ -200,15 +203,16 @@ function App(): React.ReactNode {
             },
             {
               autoClose:
-                GameConfiguration.Toasts.POSSIBLE_GAME_CRASH_TOAST_AUTOCLOSE,
+              GameConfiguration.Toasts.POSSIBLE_GAME_CRASH_TOAST_AUTOCLOSE,
               closeOnClick:
-                GameConfiguration.Toasts
-                  .POSSIBLE_GAME_CRASH_TOAST_CLOSE_ON_CLICK,
+              GameConfiguration.Toasts
+                .POSSIBLE_GAME_CRASH_TOAST_CLOSE_ON_CLICK,
             },
           );
         }
       }
     }
+
     /* eslint-enable */
 
     window.addEventListener("message", onMessageHandler, false);
@@ -246,7 +250,7 @@ function App(): React.ReactNode {
     const checkFocusID = setInterval(() => {
       setShowNoFocusMessage(
         !document.hasFocus() ||
-          !simulatorRef.current?.contentDocument?.hasFocus(),
+        !simulatorRef.current?.contentDocument?.hasFocus(),
       );
     }, 100);
 
@@ -271,7 +275,7 @@ function App(): React.ReactNode {
           width: "100%",
           height: "100%",
           backgroundColor:
-            GameConfiguration.FocusDetector.FOCUS_DETECTOR_BACKGROUND_COLOR,
+          GameConfiguration.FocusDetector.FOCUS_DETECTOR_BACKGROUND_COLOR,
           pointerEvents: "none",
           zIndex: 1001,
         }}
@@ -286,7 +290,7 @@ function App(): React.ReactNode {
             fontFamily: "monospace",
             textAlign: "center",
             color:
-              GameConfiguration.FocusDetector.FOCUS_DETECTOR_FOREGROUND_COLOR,
+            GameConfiguration.FocusDetector.FOCUS_DETECTOR_FOREGROUND_COLOR,
             fontSize: GameConfiguration.FocusDetector.FOCUS_DETECTOR_FONT_SIZE,
             pointerEvents: "none",
           }}
@@ -306,7 +310,7 @@ function App(): React.ReactNode {
           zIndex: 1000,
         }}
         hidden={!GameConfiguration.DebugStats.SHOW_STATS ||
-            statsInnerText.length === 0}
+          statsInnerText.length === 0}
       >
         {statsInnerText}
       </div>
