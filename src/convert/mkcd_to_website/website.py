@@ -1,6 +1,7 @@
 import json
 import logging
 import shutil
+from io import BytesIO
 from pathlib import Path
 from typing import Callable
 
@@ -141,8 +142,9 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
         if config.icon_source_type == IconSourceType.URL:
             logger.debug(f"Downloading icon from {config.icon}")
             res = requests.get(config.icon)
+            buffer = BytesIO(res.content)
             if res.ok:
-                im = Image.open(res.content)
+                im = Image.open(buffer)
             else:
                 raise Exception(
                     f"Failed to download icon: {res.status_code} {res.reason}")
