@@ -6,9 +6,9 @@ Convert your MakeCode Arcade games into a standalone offline executable!
 
 ### Dependencies
 
-* Python (tested with version 3.12)
-* Node (tested with version v20)
-* Rust if building with Tauri (tested with compiler version 1.87)
+* Python (earliest version tested with is 3.12)
+* Node (earliest version tested with is v20)
+* Rust (earliest version tested with is 1.86) if building with Tauri
 
 ### Steps
 
@@ -77,7 +77,8 @@ find an installer in the `make` subdirectory.
 #### Executable with Tauri (recommended option)
 
 > This is the recommended option due to the small size and standalone nature of
-> the executable. (~10 mb single executable with Tauri compared to almost 300 mb
+> the executable. (~10 mb single executable with Tauri compared to almost 300
+> mb
 > in files with Electron)
 
 If the output is set to `tauri`, you will get an executable using the Tauri
