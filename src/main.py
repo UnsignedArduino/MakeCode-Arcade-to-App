@@ -20,12 +20,8 @@ parser.add_argument("config_path", type=Path,
 parser.add_argument("--no-cache", action="store_true",
                     help="Do not use cached files. This will delete and download all "
                          "necessary files.")
-parser.add_argument("--skip-env-prep", action="store_true",
-                    help="Skip environment preparation. This is useful for debugging.")
 parser.add_argument("--skip-source-download", action="store_true",
                     help="Skip source code download. This is useful for debugging.")
-parser.add_argument("--skip-ext-install", action="store_true",
-                    help="Skip extension installation. This is useful for debugging.")
 parser.add_argument("--skip-bin-build", action="store_true",
                     help="Skip building the game binary. This is useful for debugging.")
 parser.add_argument("--skip-website-gen", action="store_true",
@@ -59,9 +55,7 @@ logger.debug(f"Window title will be {config.title}")
 no_cache = bool(args.no_cache)
 if no_cache:
     logger.info("No cache option selected. Ignoring cached files.")
-skip_env_prep = bool(args.skip_env_prep)
 skip_source_download = bool(args.skip_source_download)
-skip_ext_install = bool(args.skip_ext_install)
 skip_bin_build = bool(args.skip_bin_build)
 skip_website_gen = bool(args.skip_website_gen)
 skip_website_build = bool(args.skip_website_build)
@@ -76,15 +70,6 @@ logger.debug(f"Current working directory: {cwd} (source code directory will be "
              f"downloaded here)")
 logger.debug(f"Source code directory: {src_dir}")
 cwd.mkdir(parents=True, exist_ok=True)
-# npx pxt target arcade
-if skip_env_prep:
-    logger.info("Skipping environment preparation")
-else:
-    logger.info(f"Setting up environment")
-    if no_cache:
-        logger.debug("Checking for existing environment to remove")
-        delete_these(["node_modules", "package.json", "package-lock.json"], cwd)
-    run_shell_command("npx pxt target arcade", cwd=cwd)
 
 # Download source code
 if skip_source_download:
@@ -94,18 +79,8 @@ else:
     logger.info("Downloading source code")
     source_code_path = download_source(config, cwd, no_cache)
 
-# npx pxt install
-if skip_ext_install:
-    logger.info("Skipping extension installation")
-else:
-    logger.info("Installing extensions")
-    if no_cache:
-        logger.debug("Cleaning")
-        run_shell_command("npx pxt clean", cwd=source_code_path)
-    run_shell_command("npx pxt install", cwd=source_code_path)
-
 # npx pxt build
-binary_js_path = source_code_path / "built" / "debug" / "binary.js"
+binary_js_path = source_code_path / "built" / "binary.js"
 if skip_bin_build:
     logger.info("Skipping build")
 else:
@@ -115,7 +90,7 @@ else:
         if binary_js_path.exists():
             logger.debug(f"Deleting {binary_js_path}")
             binary_js_path.unlink()
-    run_shell_command("npx pxt build", cwd=source_code_path)
+    run_shell_command("npx mkc build -j", cwd=source_code_path)
 logger.debug(f"Binary JS path: {binary_js_path}")
 
 # yarn create vite, copy files, and substitute values
