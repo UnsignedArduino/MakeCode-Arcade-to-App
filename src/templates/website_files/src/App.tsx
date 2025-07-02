@@ -163,6 +163,7 @@ function App(): React.ReactNode {
         if (GameConfiguration.Toasts.ENABLE_POSSIBLE_GAME_CRASH_TOAST) {
           toast.error(
             ({closeToast}) => {
+              gameCrashToastCloseCallbackRef.current = closeToast;
               return (
                 <div>
                   {

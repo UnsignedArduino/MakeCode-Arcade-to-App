@@ -50,20 +50,7 @@ def download_source(config: Config, cwd: Path,
     elif config.source_type == SourceType.SHARE_LINK:
         logger.info(f"Downloading source from share link")
         source_code_path.mkdir(parents=True, exist_ok=True)
-        run_shell_command(f"mkc download {config.source}", cwd=source_code_path)
-        # Since we're using pxt extract, we need to move the contents of the directory
-        # inside source_code_path to source_code_path itself
-        extract_path = None
-        for item in source_code_path.iterdir():
-            if item.is_dir():
-                # This is the directory created by pxt extract
-                extract_path = Path(item)
-                break
-        logger.debug(
-            f"Moving extracted directory contents {extract_path} to {source_code_path}")
-        for item in extract_path.iterdir():
-            shutil.move(item, source_code_path / item.name)
-        extract_path.rmdir()
+        run_shell_command(f"npx mkc download {config.source}", cwd=source_code_path)
     elif config.source_type == SourceType.PATH:
         logger.info(f"Copying source from path")
         source_code_path.mkdir(parents=True, exist_ok=True)
