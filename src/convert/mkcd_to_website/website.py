@@ -33,7 +33,7 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
     if (cwd / prj_name).exists():
         logger.debug(f"Project {prj_name} already exists, continuing...")
     else:
-        run_shell_command(f"yarn create vite {prj_name} -t react-ts", cwd=cwd)
+        run_shell_command(f"yarn create vite {prj_name} -t react-ts --no-interactive --no-rolldown", cwd=cwd)
     # Start copying files from template
     old_dir = template_dir
     new_dir = cwd / prj_name
