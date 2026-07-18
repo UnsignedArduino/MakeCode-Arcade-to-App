@@ -21,14 +21,14 @@ Convert your MakeCode Arcade games into a standalone offline executable!
 
 Quick start:
 
-1. Create a yaml configuration file. See
+1. Create a YAML configuration file. See
    [`Racers to Electron.yaml`](examples/Racers%20to%20Electron.yaml) for an
    example.
-2. Run the script with `python main.py "examples/Racers to Electron.yaml"`.
+2. Run the script with `python src/main.py "examples/Racers to Electron.yaml"`.
 
 ### Input
 
-A yaml configuration file is used. Check out the examples in the
+A YAML configuration file is used. Check out the examples in the
 [`examples`](examples) directory to see how it's used, as it's
 self-explanatory. Pass it as the first positional argument to the script.
 
