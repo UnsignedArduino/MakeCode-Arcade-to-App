@@ -1,4 +1,6 @@
+pydantic
 pyyaml
+doit
 requests
 beautifulsoup4
 pillow
