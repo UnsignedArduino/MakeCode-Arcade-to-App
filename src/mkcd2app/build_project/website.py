@@ -58,7 +58,7 @@ def fill_website_template(config: BuildConfig,
                           bin_js_path: ContentFile,
                           support_path: ContentDir) -> ContentDir:
     """
-    "Fill" the website template. (Currently just need to copy files to public directory)
+    "Fill" the website template.
 
     :param config: App build configuration
     :param website_path: redun.ContentDir that points to the Vite website directory.
@@ -82,7 +82,7 @@ def fill_website_template(config: BuildConfig,
     title = config.project.title.format(NAME=config.project.name,
                                         VERSION=config.project.version,
                                         AUTHOR=config.project.author)
-    logger.debug(f"Using title \"{title}\"")
+    logger.debug(f"Using title \"{title}\" in index.html")
     index_html_path = website_path / "index.html"
     index_html_text = index_html_path.read_text()
     index_html_text = index_html_text.replace("<title>vite-project</title>",

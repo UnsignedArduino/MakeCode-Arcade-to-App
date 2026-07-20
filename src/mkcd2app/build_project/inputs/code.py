@@ -1,13 +1,17 @@
 import logging
+from io import BytesIO
 from pathlib import Path
 
 import requests
+from PIL import Image
 from bs4 import BeautifulSoup
 from redun import task
 from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import BuildConfig
-from mkcd2app.config.model import GitHubCodeSource, PathCodeSource, ShareLinkCodeSource
+from mkcd2app.config.model import GitHubCodeSource, PathAssetSource, PathCodeSource, \
+    ShareLinkCodeSource, \
+    UrlAssetSource
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.run import run_cmd
 
@@ -117,7 +121,19 @@ def download_supporting_files(config: BuildConfig) -> ContentDir:
     path.write_text(new_sim_html)
     logger.debug(f"Wrote modified simulator HTML to {path}")
 
-    # TODO: Get specified icon in config.project.icon and download it to the
-    #  support_path
+    if config.inputs.assets.icon:
+        match config.inputs.assets.icon.root:
+            case UrlAssetSource(value=url):
+                logger.debug(f"Downloading icon from {url}")
+                res = requests.get(str(url))
+                res.raise_for_status()
+                buffer = BytesIO(res.content)
+                im = Image.open(buffer)
+            case PathAssetSource(value=path):
+                logger.debug(f"Opening icon from {path}")
+                im = Image.open(path)
+        favicon_path = support_path / "favicon.ico"
+        logger.debug(f"Saving favicon to {favicon_path}")
+        im.save(favicon_path)
 
     return ContentDir(str(support_path))
