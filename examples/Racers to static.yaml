@@ -7,6 +7,7 @@ version: 1
 
 project:
   name: Racers
+  path_friendly_name: racers
   description: "Enjoy the high-speed thrills of car racing in MakeCode Arcade! 
     For the MakeCode Arcade Mini Game Jam #3."
   author: UnsignedArduino
@@ -43,7 +44,7 @@ inputs:
 #      value: "./examples/Racers icon.png"
 
 # Path where we
-build_dir: "./examples/Racers build"
+build_dir: "./examples/Racers-build"
 
 # You can have multiple outputs
 # Currently available options are static, electron, and tauri

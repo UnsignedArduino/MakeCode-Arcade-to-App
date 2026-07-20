@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, HttpUrl, RootModel
 
@@ -21,7 +21,12 @@ class PathCodeSource(BaseModel):
     value: str
 
 
-CodeSource = RootModel[Union[ShareLinkCodeSource, GitHubCodeSource, PathCodeSource]]
+CodeSource = RootModel[
+    Annotated[
+        Union[ShareLinkCodeSource, GitHubCodeSource, PathCodeSource],
+        Field(discriminator="type")
+    ]
+]
 
 
 # Assets can be a URL or path on disk
@@ -36,7 +41,12 @@ class PathAssetSource(BaseModel):
     value: str
 
 
-AssetSource = RootModel[Union[UrlAssetSource, PathAssetSource]]
+AssetSource = RootModel[
+    Annotated[
+        Union[UrlAssetSource, PathAssetSource],
+        Field(discriminator="type")
+    ]
+]
 
 
 # Right now we only have one asset so far, just the icon
@@ -53,6 +63,7 @@ class Inputs(BaseModel):
 # Project metadata
 class Project(BaseModel):
     name: str
+    path_friendly_name: str
     description: Optional[str] = None
     author: str
     version: str
@@ -82,11 +93,16 @@ class TauriOutput(BaseModel):
     window: Optional[WindowConfig] = None
 
 
-OutputOption = RootModel[Union[StaticOutput, ElectronOutput, TauriOutput]]
+OutputOption = RootModel[
+    Annotated[
+        Union[StaticOutput, ElectronOutput, TauriOutput],
+        Field(discriminator="type")
+    ]
+]
 
 
 # The entire config
-class Config(BaseModel):
+class BuildConfig(BaseModel):
     version: int  # currently only 1 version so far
     project: Project
     inputs: Inputs

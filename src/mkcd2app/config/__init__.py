@@ -2,13 +2,13 @@ import logging
 
 import yaml
 
-from config.model import Config
-from utils.logger import create_logger
+from mkcd2app.config.model import BuildConfig
+from mkcd2app.utils.logger import create_logger
 
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def load_config_from_yaml(config_text: str) -> Config:
+def load_config_from_yaml(config_text: str) -> BuildConfig:
     """
     Load a config from YAML text.
 
@@ -19,7 +19,7 @@ def load_config_from_yaml(config_text: str) -> Config:
     data = yaml.safe_load(config_text)
 
     if data["version"] == 1:  # only one config version so far
-        config = Config(**data)
+        config = BuildConfig(**data)
     else:
         raise NotImplementedError(f"Unknown config version {data.version}")
     logger.debug(f"Loaded config version {config.version}")

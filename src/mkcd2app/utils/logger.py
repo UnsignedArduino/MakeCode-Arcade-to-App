@@ -56,5 +56,5 @@ def set_all_stdout_logger_levels(level: int):
     for nm, lgr in logging.Logger.manager.loggerDict.items():
         if not isinstance(lgr, logging.PlaceHolder):
             for h in lgr.handlers:
-                if "<stdout>" in repr(h):
+                if isinstance(h, logging.StreamHandler) and h.stream == sys.stdout:
                     h.setLevel(level)
