@@ -8,10 +8,11 @@ version = "0.1.0"
 description = "Convert MakeCode Arcade games into static websites, Electron, or Tauri apps"
 readme = "README.md"
 requires-python = ">=3.14"
+# We are pinning redun because we monkey patch something
 dependencies = [
     "pydantic",
     "pyyaml",
-    "redun",
+    "redun==0.44.1",
     "requests",
     "beautifulsoup4",
     "pillow",

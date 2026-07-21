@@ -3,7 +3,32 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import redun
+import redun.file
 from redun import Scheduler
+
+# Monkey patch ContentDir to use content-based hashing instead of mtime-based hashing.
+# This addresses the issue where cache busts even on identical runs.
+# Note: ContentDir.__iter__() already yields ContentFile objects (via
+# ContentFileClasses), so f.hash is content-based — no need to create redundant
+# ContentFile instances.
+def _content_dir_calc_hash(self, files=None):
+    if files is None:
+        files = list(self)
+    from redun.hashing import hash_struct
+    return hash_struct([self.type_basename, self.path] + sorted(f.hash for f in files))
+
+redun.file.ContentDir._calc_hash = _content_dir_calc_hash
+
+# Also patch Dir._calc_hash to prevent mtime-based hashing leak through any
+# code path that uses Dir directly (e.g. FileSystem.iter_file_hashes).
+# Note: we intentionally drop the `files` param because Dir.update_hash()
+# passes File objects (mtime-based), not ContentFile objects. Re-iterating
+# via ContentDir gives properly content-based hashing.
+def _dir_calc_hash(self, files=None):
+    from redun.file import ContentDir
+    return ContentDir(self.path)._calc_hash()
+
+redun.file.Dir._calc_hash = _dir_calc_hash
 
 from mkcd2app.build_project import build_project
 from mkcd2app.config import load_config_from_yaml
@@ -36,13 +61,28 @@ def main():
         config_path = Path(args.config)
         logger.debug(f"Loading config from {config_path}")
         config_text = config_path.read_text()
-        config = load_config_from_yaml(config_text)
 
+        # Parse once only to extract build_dir for the redun DB path.
+        # The raw YAML text is passed to redun tasks so that argument
+        # hashing is deterministic (string) rather than pickle-based
+        # (which is non-deterministic due to pydantic's set fields).
+        config = load_config_from_yaml(config_text)
+        build_dir = Path(config.build_dir)
+        build_dir.mkdir(parents=True, exist_ok=True)
+        db_uri = f"sqlite:///{build_dir.resolve() / '.redun-cache.db'}"
+        logger.debug(f"redun cache DB: {db_uri}")
         # noinspection PyUnresolvedReferences
-        redun_config = redun.config.Config({"scheduler": {"log_level": "DEBUG"}})
+        redun_config = redun.config.Config({
+            "scheduler": {"log_level": "DEBUG"},
+            "backend": {"db_uri": db_uri},
+        })
         scheduler = Scheduler(config=redun_config)
+        # Load/migrate the backend so the persistent DB is properly set up.
+        # Without this, providing a custom db_uri skips the automatic
+        # engine creation and migration that the in-memory default does.
+        scheduler.load()
         result = scheduler.run(
-            build_project(config),
+            build_project(config_text),
         )
 
         logger.debug(f"Build finished, result is at {result}")
