@@ -10,7 +10,7 @@ project:
   path_friendly_name: racers
   description: "Enjoy the high-speed thrills of car racing in MakeCode Arcade! 
     For the MakeCode Arcade Mini Game Jam #3."
-  author: UnsignedArduino
+  author: Cyrus Yiu
   version: 1.3.2
   # This is what the window title will be
   # This will also be used for the executable file name for Electron outputs

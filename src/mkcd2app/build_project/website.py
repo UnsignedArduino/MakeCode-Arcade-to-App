@@ -1,3 +1,4 @@
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -89,6 +90,17 @@ def fill_website_template(config_yaml: str,
     index_html_text = index_html_text.replace("<title>vite-project</title>",
                                               f"<title>{title}</title>")
     index_html_path.write_text(index_html_text)
+
+    logger.debug("Updating package.json")
+    package_json_path = dst / "package.json"
+    package_json = json.loads(package_json_path.read_text())
+    package_json["name"] = config.project.path_friendly_name
+    package_json["version"] = config.project.version
+    package_json["description"] = config.project.description
+    package_json["authors"] = {
+        "name": config.project.author
+    }
+    package_json_path.write_text(json.dumps(package_json, indent=2))
 
     logger.debug("Website template filled")
     return ContentDir(str(dst))
