@@ -76,7 +76,7 @@ def build_project(config_yaml: str):
         # Build binary.js with `mkc`
         bin_js_path = build_binary_js(config_yaml, code_path)
         # Download supporting files to run binary.js, including ---simulator.html and all
-        # it's references
+        # it's references, and get favicon.ico if present
         support_path = download_supporting_files(config_yaml)
 
         # Copy website template (clean copy with template files only)

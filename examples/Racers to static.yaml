@@ -34,6 +34,8 @@ inputs:
   #    value: "E:/Racers"
 
   assets:
+    # Icon is optional but highly recommended, it will be used as the favicon
+    # and app icon
     icon:
       # Can be url or path
       type: url

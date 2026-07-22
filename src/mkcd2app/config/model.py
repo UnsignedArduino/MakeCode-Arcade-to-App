@@ -51,7 +51,7 @@ AssetSource = RootModel[
 
 # Right now we only have one asset so far, just the icon
 class Assets(BaseModel):
-    icon: AssetSource
+    icon: Optional[AssetSource] = None
 
 
 # To build a project, we need multiple inputs
