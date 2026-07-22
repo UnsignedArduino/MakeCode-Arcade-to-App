@@ -7,7 +7,6 @@ from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.utils.logger import create_logger
-from mkcd2app.utils.resources import get_template_path
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
@@ -19,14 +18,16 @@ def _website_dir(build_dir: Path, name: str, suffix: str) -> Path:
 
 
 @task(namespace="mkcd2app")
-def copy_website_template(config_yaml: str) -> ContentDir:
+def copy_website_template(config_yaml: str, template_src: ContentDir) -> ContentDir:
     """
     Copy the template to the build directory.
 
-    Example input: config_yaml
+    Example input: config_yaml, template_src
     Example output: racers-website
 
     :param config_yaml: The raw YAML text of the config file.
+    :param template_src: A redun.ContentDir pointing to the template source,
+                         so that redun tracks changes to template files.
     :return: A redun.ContentDir that points to the Vite website template directory.
     """
     config = load_config_from_yaml(config_yaml)
@@ -34,9 +35,8 @@ def copy_website_template(config_yaml: str) -> ContentDir:
     logger.info(f"Website will be copied to {dst}")
     if dst.exists():
         shutil.rmtree(dst)
-    with get_template_path("vite-project") as src:
-        logger.debug(f"Copying template from {src}")
-        shutil.copytree(src, dst)
+    logger.debug(f"Copying template from {template_src.path}")
+    shutil.copytree(template_src.path, dst)
     logger.debug("Website template copied")
     return ContentDir(str(dst))
 
@@ -95,25 +95,31 @@ def fill_website_template(config_yaml: str,
 
 
 @task(namespace="mkcd2app")
-def install_website_dependencies(website_filled_path: ContentDir) -> ContentDir:
+def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDir:
     """
-    Make a copy of the template website, then ``npm ci`` in it.
+    Make a copy of the template website, then ``npm ci`` and `npm run build` in it.
 
     We copy so that we never mutate a ContentDir that another task owns,
     keeping ContentDir hashes stable for caching.
 
     Example input: racers-website-filled
-    Example output: racers-website-filled-deps
+    Example output: racers-website-filled-built
 
     :param website_filled_path: A redun.ContentDir pointing to the template website.
     :return: A redun.ContentDir pointing to the deps-installed website copy.
     """
     src = Path(website_filled_path.path)
-    dst = src.parent / f"{src.name}-deps"
-    logger.info(f"Installing website dependencies — copy {src} -> {dst}")
+    dst = src.parent / f"{src.name}-built"
+    logger.info(f"Installing website dependencies and building to static HTML/CSS/JS")
+
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
+
     run_cmd("npm ci", cwd=dst)
     logger.debug("Website dependencies installed")
+
+    run_cmd("npm run build", cwd=dst)
+    logger.debug("Website built successfully")
+
     return ContentDir(str(dst))

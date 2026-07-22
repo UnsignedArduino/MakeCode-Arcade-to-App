@@ -6,6 +6,17 @@ import redun
 import redun.file
 from redun import Scheduler
 
+# Monkey-patch redun.file.get_proto so Windows absolute paths like "E:\..."
+# aren't parsed as having scheme "e" by urllib.parse.urlparse.
+_orig_get_proto = redun.file.get_proto
+
+def _patched_get_proto(url: str | None = None) -> str:
+    if url and len(url) >= 3 and url[1] == ":" and url[0].isalpha() and url[2] in ("\\", "/"):
+        return "local"
+    return _orig_get_proto(url)
+
+redun.file.get_proto = _patched_get_proto
+
 # Monkey patch ContentDir to use content-based hashing instead of mtime-based hashing.
 # This addresses the issue where cache busts even on identical runs.
 # Note: ContentDir.__iter__() already yields ContentFile objects (via
