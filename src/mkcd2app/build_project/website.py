@@ -117,10 +117,10 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
 
-    run_cmd("npm ci", cwd=dst)
+    run_cmd(["npm", "ci"], cwd=dst)
     logger.debug("Website dependencies installed")
 
-    run_cmd("npm run build", cwd=dst)
+    run_cmd(["npm", "run", "build"], cwd=dst)
     logger.debug("Website built successfully")
 
     actual_dist = dst / "dist"

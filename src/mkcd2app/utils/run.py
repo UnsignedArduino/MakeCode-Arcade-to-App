@@ -1,4 +1,6 @@
 import logging
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -13,17 +15,30 @@ class BuildError(Exception):
         super().__init__(f"{command} failed ({returncode}) in {cwd}")
 
 
-def run_cmd(command: str, cwd: Path | str) -> str:
+def run_cmd(command: list[str], cwd: Path | str) -> str:
     """
-    Runs a command and captures its output.
+    Runs a command (as a list, no shell) and captures its output.
 
-    :param command: The command to run - this is executed as a shell command!
-    :param cwd: The current working directory to execute the command in.
-    :return: The stdout
+    The executable in ``command[0]`` is resolved via ``shutil.which()`` so
+    the platform-appropriate variant is used (e.g. ``npm.cmd`` on Windows,
+    ``npm`` on Unix).
+
+    :param command: The command as a list of arguments, e.g. ``["npm", "ci"]``.
+    :param cwd: The working directory to execute the command in.
+    :return: The stdout.
     :raises BuildError: If the command fails.
+    :raises FileNotFoundError: If the executable cannot be found on PATH.
     """
-    logger.debug(f"Running command `{command}` in {cwd}")
-    proc = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True)
+    resolved = shutil.which(command[0])
+    if resolved is None:
+        raise FileNotFoundError(
+            f"Executable '{command[0]}' not found on PATH. "
+            f"Current PATH: {os.environ.get('PATH', '')}"
+        )
+    cmd_list = [resolved, *command[1:]]
+    logger.debug(f"Running {command} in {cwd}")
+    proc = subprocess.run(cmd_list, shell=False, cwd=cwd, capture_output=True,
+                          text=True)
     if proc.returncode != 0:
         raise BuildError(command, cwd, proc.returncode, proc.stdout + proc.stderr)
     return proc.stdout

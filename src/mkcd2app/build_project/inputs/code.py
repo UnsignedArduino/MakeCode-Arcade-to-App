@@ -48,7 +48,7 @@ def fetch_code(config_yaml: str, node_modules_for_mkc: ContentDir) -> ContentDir
             logger.debug(f"Downloading source code from {url}")
             code_path.mkdir(parents=True)
             logger.debug(f"Using `mkc` from {node_modules_for_mkc}")
-            run_cmd(f"npx mkc download {url}", cwd=code_path)
+            run_cmd(["npx", "mkc", "download", str(url)], cwd=code_path)
         case GitHubCodeSource(value=url, checkout=checkout_target):
             logger.debug(f"Downloading source code from {url}@{checkout_target}")
         case PathCodeSource(value=path):
@@ -76,7 +76,7 @@ def build_binary_js(config_yaml: str, code_path: ContentDir) -> ContentFile:
 
     cwd = Path(code_path.path)
     logger.debug(f"Building in cwd {cwd}")
-    run_cmd("npx mkc build -j", cwd=cwd)
+    run_cmd(["npx", "mkc", "build", "-j"], cwd=cwd)
 
     bin_js_path = cwd / "built" / "binary.js"
     logger.debug(f"binary.js available at {bin_js_path}")

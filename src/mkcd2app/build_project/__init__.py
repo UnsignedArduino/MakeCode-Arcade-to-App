@@ -41,7 +41,7 @@ def install_mkcd_build_tools(config_yaml: str,
     shutil.copy(js_tools_path / "package-lock.json",
                 build_path / "package-lock.json")
 
-    run_cmd("npm ci", cwd=build_path)
+    run_cmd(["npm", "ci"], cwd=build_path)
 
     logger.debug("All MakeCode Arcade build tools installed")
 
