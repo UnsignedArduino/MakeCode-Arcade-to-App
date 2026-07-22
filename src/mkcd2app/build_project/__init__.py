@@ -87,6 +87,6 @@ def build_project(config_yaml: str):
                                                     bin_js_path,
                                                     support_path)
         # Copy + `npm ci` + `npm run build` (separate dir for same reason)
-        website_built_path = install_deps_and_build_website(website_filled_path)
+        website_dist_path = install_deps_and_build_website(website_filled_path)
 
-        return website_built_path
+        return website_dist_path

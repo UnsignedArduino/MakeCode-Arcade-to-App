@@ -106,7 +106,8 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
     Example output: racers-website-filled-built
 
     :param website_filled_path: A redun.ContentDir pointing to the template website.
-    :return: A redun.ContentDir pointing to the deps-installed website copy.
+    :return: A redun.ContentDir pointing to the directory of static HTML/CSS/JS files
+     ready to serve. 
     """
     src = Path(website_filled_path.path)
     dst = src.parent / f"{src.name}-built"
@@ -122,4 +123,8 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
     run_cmd("npm run build", cwd=dst)
     logger.debug("Website built successfully")
 
-    return ContentDir(str(dst))
+    actual_dist = dst / "dist"
+
+    logger.debug(f"Static HTML/CSS/JS files at {actual_dist}")
+
+    return ContentDir(str(actual_dist))

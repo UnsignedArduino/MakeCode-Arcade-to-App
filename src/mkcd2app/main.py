@@ -110,11 +110,9 @@ def main():
         # Without this, providing a custom db_uri skips the automatic
         # engine creation and migration that the in-memory default does.
         scheduler.load()
-        result = scheduler.run(
+        scheduler.run(
             build_project(config_text),
         )
-
-        logger.debug(f"Build finished, result is at {result}")
 
 
 if __name__ == "__main__":
