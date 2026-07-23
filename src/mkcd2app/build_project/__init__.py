@@ -1,16 +1,20 @@
 import logging
 import shutil
 from contextlib import ExitStack
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 from redun import task
-from redun.file import ContentDir
+from redun.file import ContentDir, ContentFile
 
 from mkcd2app.build_project.inputs.code import build_binary_js, \
     download_and_mod_supporting_files, fetch_code
 from mkcd2app.build_project.website import copy_website_template, \
-    fill_website_template, install_deps_and_build_website
+    fill_website_template, install_deps_and_build_website, \
+    install_deps_and_build_website_singlefile
 from mkcd2app.config import load_config_from_yaml
+from mkcd2app.config.model import StaticOutput, StaticSinglefileOutput
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.resources import get_js_tools_path, get_template_path
 from mkcd2app.utils.run import run_cmd
@@ -48,12 +52,21 @@ def install_mkcd_build_tools(config_yaml: str,
     return ContentDir(str(build_path / "node_modules"))
 
 
+@dataclass
+class BuildProjectResult:
+    static: Optional[ContentDir] = None
+    static_singlefile: Optional[ContentFile] = None
+    electron: Optional[ContentDir] = None
+    tauri: Optional[ContentDir] = None
+
+
 @task(namespace="mkcd2app")
-def build_project(config_yaml: str):
+def build_project(config_yaml: str) -> BuildProjectResult:
     """
     Build the project.
 
     :param config_yaml: The raw YAML text of the config file.
+    :return BuildProjectResult: A BuildProjectResult object containing paths.
     """
     logger.info("Building project")
 
@@ -86,7 +99,19 @@ def build_project(config_yaml: str):
         website_filled_path = fill_website_template(config_yaml, website_path,
                                                     bin_js_path,
                                                     support_path)
-        # Copy + `npm ci` + `npm run build` (separate dir for same reason)
-        website_dist_path = install_deps_and_build_website(website_filled_path)
 
-        return website_dist_path
+        results = BuildProjectResult()
+
+        logger.debug(f"{config.outputs=}")
+        for output in config.outputs:
+            match output.root:
+                case StaticOutput():
+                    # Copy + `npm ci` + `npm run build` (separate dir for same reason)
+                    results.static = install_deps_and_build_website(website_filled_path)
+                    logger.debug("Will build to static website")
+                case StaticSinglefileOutput():
+                    results.static_singlefile = install_deps_and_build_website_singlefile(
+                        website_filled_path)
+                    logger.debug("Will build to static single-file website")
+
+        return results

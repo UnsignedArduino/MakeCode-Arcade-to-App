@@ -152,3 +152,39 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
     logger.debug(f"Static HTML/CSS/JS files at {actual_dist}")
 
     return ContentDir(str(actual_dist))
+
+
+@task(namespace="mkcd2app")
+def install_deps_and_build_website_singlefile(
+        website_filled_path: ContentDir) -> ContentFile:
+    """
+    Make a copy of the template website, then ``npm ci`` and `npm run build:singlefile` in it.
+
+    We copy so that we never mutate a ContentDir that another task owns,
+    keeping ContentDir hashes stable for caching.
+
+    Example input: racers-website-filled
+    Example output: index.html
+
+    :param website_filled_path: A redun.ContentDir pointing to the template website.
+    :return: A redun.ContentFile pointing to the single-file HTML.
+    """
+    src = Path(website_filled_path.path)
+    dst = src.parent / f"{src.name}-singlefile-built"
+    logger.info(f"Installing website dependencies and building to static HTML file")
+
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+
+    run_cmd(["npm", "ci"], cwd=dst)
+    logger.debug("Website dependencies installed")
+
+    run_cmd(["npm", "run", "build:singlefile"], cwd=dst)
+    logger.debug("Website built successfully")
+
+    actual_dist = dst / "dist" / "index.html"
+
+    logger.debug(f"Static HTML file at {actual_dist}")
+
+    return ContentFile(str(actual_dist))

@@ -82,6 +82,10 @@ class StaticOutput(BaseModel):
     type: Literal["static"]
 
 
+class StaticSinglefileOutput(BaseModel):
+    type: Literal["static-singlefile"]
+
+
 class ElectronOutput(BaseModel):
     type: Literal["electron"]
     window: Optional[WindowConfig] = None
@@ -95,7 +99,7 @@ class TauriOutput(BaseModel):
 
 OutputOption = RootModel[
     Annotated[
-        Union[StaticOutput, ElectronOutput, TauriOutput],
+        Union[StaticOutput, StaticSinglefileOutput, ElectronOutput, TauriOutput],
         Field(discriminator="type")
     ]
 ]

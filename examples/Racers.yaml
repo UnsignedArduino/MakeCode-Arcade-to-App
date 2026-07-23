@@ -49,9 +49,11 @@ inputs:
 build_dir: "./examples/Racers-build"
 
 # You can have multiple outputs
-# Currently available options are static, electron, and tauri
+# Currently available options are static, static-singlefile, electron, and
+# tauri
 outputs:
   - type: static
+  - type: static-singlefile
 #  - type: electron
 #    window:
 #      width: 640

@@ -7,7 +7,7 @@ import redun
 import redun.file
 from redun import Scheduler
 
-from mkcd2app.build_project import build_project
+from mkcd2app.build_project import BuildProjectResult, build_project
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
 
@@ -68,9 +68,14 @@ def main():
         # Without this, providing a custom db_uri skips the automatic
         # engine creation and migration that the in-memory default does.
         scheduler.load()
-        scheduler.run(
+        results: BuildProjectResult = scheduler.run(
             build_project(config_text),
         )
+        if results.static:
+            logger.info(f"Static website directory is at {results.static.path}")
+        if results.static_singlefile:
+            logger.info(f"Static single-file HTML is at "
+                        f"{results.static_singlefile.path}")
 
 
 if __name__ == "__main__":
