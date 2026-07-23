@@ -77,8 +77,9 @@ def fill_website_template(config_yaml: str,
     logger.debug(f"Copying binary.js from {bin_js_path.path}")
     shutil.copy(bin_js_path.path, asset_path)
 
-    logger.debug(f"Copying support files from {support_path.path}")
-    shutil.copytree(support_path.path, public_path, dirs_exist_ok=True)
+    simulator_html_path = Path(support_path.path) / "---simulator.html"
+    logger.debug(f"Copying ---simulator.html from {simulator_html_path}")
+    shutil.copy(simulator_html_path, asset_path)
 
     title = config.project.title.format(NAME=config.project.name,
                                         VERSION=config.project.version,
@@ -89,7 +90,7 @@ def fill_website_template(config_yaml: str,
     index_html_text = index_html_text.replace("<title>vite-project</title>",
                                               f"<title>{title}</title>")
 
-    favicon_path = public_path / "favicon.ico"
+    favicon_path = Path(support_path.path) / "favicon.ico"
     if favicon_path.exists():
         favicon_b64 = base64.b64encode(favicon_path.read_bytes()).decode("ascii")
         favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"

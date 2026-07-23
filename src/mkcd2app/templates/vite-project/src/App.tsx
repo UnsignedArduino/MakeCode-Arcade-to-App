@@ -9,6 +9,7 @@ import {toast} from "react-toastify";
 import {GameConfiguration} from "./gameConfiguration.ts";
 import {positionFixedElement} from "./utils/position.ts";
 import binaryJs from "./assets/binary.js?raw";
+import simulatorHtml from "./assets/---simulator.html?raw";
 
 function App(): React.ReactNode {
   const simulatorRef = React.useRef<HTMLIFrameElement>(null);
@@ -34,6 +35,15 @@ function App(): React.ReactNode {
   });
   const [showNoFocusMessage, setShowNoFocusMessage] = React.useState(false);
   const [statsInnerText, setStatsInnerText] = React.useState("");
+
+  const srcdocHtml = React.useMemo(
+    () =>
+      simulatorHtml.replace(
+        "</body>",
+        `<script>addEventListener("DOMContentLoaded",()=>{pxsim.simButtonsHidden=true;document.getElementsByClassName("game-player")[0]?.classList.add("just-screen","no-padding");});</script></body>`,
+      ),
+    [],
+  );
 
   React.useEffect(() => {
     localStorage.setItem("simState", JSON.stringify(simState));
@@ -232,7 +242,7 @@ function App(): React.ReactNode {
   return (
     <div>
       <iframe
-        src="---simulator.html?hideSimButtons=1&noExtraPadding=1&fullscreen=1&autofocus=1&nofooter=1"
+        srcDoc={srcdocHtml}
         ref={simulatorRef}
         allowFullScreen
         sandbox="allow-popups allow-forms allow-scripts allow-same-origin"
