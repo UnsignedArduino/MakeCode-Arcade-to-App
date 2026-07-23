@@ -7,8 +7,8 @@
     "dev": "vite",
     "lint": "eslint ",
     "writeLint": "eslint --fix ",
-    "format": "prettier --check ",
-    "writeFormat": "prettier --write ",
+    "format": "prettier --check .",
+    "writeFormat": "prettier --write .",
     "preview": "vite preview",
     "build": "tsc -b && vite build"
   },

@@ -8,6 +8,7 @@ import {
 import { toast } from "react-toastify";
 import { GameConfiguration } from "./gameConfiguration.ts";
 import { positionFixedElement } from "./utils/position.ts";
+import binaryJs from "./assets/binary.js?raw";
 
 function App(): React.ReactNode {
   const simulatorRef = React.useRef<HTMLIFrameElement>(null);
@@ -49,34 +50,15 @@ function App(): React.ReactNode {
           GameConfiguration.Toasts.LOADING_GAME_TOAST_ERROR_MSG,
         )
       : createEmptyLoadingToastCallbacks();
-    fetch("binary.js")
-      .then((res) => {
-        if (res.ok) {
-          return res.text();
-        } else {
-          console.error(`Failed to load binary.js: ${res.statusText}`);
-        }
-      })
-      .then((text) => {
-        if (text) {
-          console.log(
-            `Loaded ${Math.round(text.length / 1024)} kb of binary.js`,
-          );
-          setCode(text);
-          if (simulatorRef.current) {
-            simulatorRef.current.src =
-              "---simulator.html?hideSimButtons=1&noExtraPadding=1&fullscreen=1&autofocus=1&nofooter=1";
-          } else {
-            console.error("Simulator iframe ref is null");
-          }
-        } else {
-          throw new Error("Failed to load binary.js: text is empty/undefined");
-        }
-      })
-      .catch((err: unknown) => {
-        console.error(err);
-        loadingGameToastCallbacksRef.current.error();
-      });
+    console.log(`Loaded ${Math.round(binaryJs.length / 1024)} kb of binary.js`);
+    setCode(binaryJs);
+    if (simulatorRef.current) {
+      simulatorRef.current.src =
+        "---simulator.html?hideSimButtons=1&noExtraPadding=1&fullscreen=1&autofocus=1&nofooter=1";
+    } else {
+      console.error("Simulator iframe ref is null");
+      loadingGameToastCallbacksRef.current.error();
+    }
   }, []);
 
   React.useEffect(() => {

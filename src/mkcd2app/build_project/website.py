@@ -73,10 +73,12 @@ def fill_website_template(config_yaml: str,
     shutil.copytree(src, dst)
 
     public_path = dst / "public"
+    asset_path = dst / "src" / "assets"
     logger.debug(f"public directory is at {public_path}")
+    logger.debug(f"asset directory is at {asset_path}")
 
     logger.debug(f"Copying binary.js from {bin_js_path.path}")
-    shutil.copy(bin_js_path.path, public_path)
+    shutil.copy(bin_js_path.path, asset_path)
 
     logger.debug(f"Copying support files from {support_path.path}")
     shutil.copytree(support_path.path, public_path, dirs_exist_ok=True)

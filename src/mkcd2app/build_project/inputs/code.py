@@ -92,9 +92,9 @@ def build_binary_js(config_yaml: str, code_path: ContentDir) -> ContentFile:
 
 
 @task(namespace="mkcd2app")
-def download_supporting_files(config_yaml: str) -> ContentDir:
+def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
     """
-    Download all supporting files needed to run binary.js for the website
+    Download and modify all supporting files needed to run binary.js for the website
 
     Example input: config_yaml
     Example output: ./racers-binary-js-support
@@ -130,22 +130,19 @@ def download_supporting_files(config_yaml: str) -> ContentDir:
             logger.debug(f"Downloading CSS file {url}")
             res = requests.get(url)
             res.raise_for_status()
-            file_name = url.split("/")[-1]
-            path = support_path / file_name
-            path.write_text(res.text)
-            css["href"] = f"./{file_name}"
-            logger.debug(f"Wrote to {path}")
+            style_tag = soup.new_tag("style")
+            style_tag.string = res.text
+            css.replace_with(style_tag)
+            logger.debug(f"Inlined CSS from {url}")
     for js in js_scripts:
         url = js.get("src")
         if url:
             logger.debug(f"Downloading JS file {url}")
             res = requests.get(url)
             res.raise_for_status()
-            file_name = url.split("/")[-1]
-            path = support_path / file_name
-            path.write_text(res.text)
-            js["src"] = f"./{file_name}"
-            logger.debug(f"Wrote to {path}")
+            js.string = res.text
+            del js["src"]
+            logger.debug(f"Inlined JS from {url}")
     new_sim_html = soup.prettify(formatter="html5")
     path = support_path / "---simulator.html"
     path.write_text(new_sim_html)

@@ -7,7 +7,7 @@ from redun import task
 from redun.file import ContentDir
 
 from mkcd2app.build_project.inputs.code import build_binary_js, \
-    download_supporting_files, fetch_code
+    download_and_mod_supporting_files, fetch_code
 from mkcd2app.build_project.website import copy_website_template, \
     fill_website_template, install_deps_and_build_website
 from mkcd2app.config import load_config_from_yaml
@@ -77,7 +77,7 @@ def build_project(config_yaml: str):
         bin_js_path = build_binary_js(config_yaml, code_path)
         # Download supporting files to run binary.js, including ---simulator.html and all
         # it's references, and get favicon.ico if present
-        support_path = download_supporting_files(config_yaml)
+        support_path = download_and_mod_supporting_files(config_yaml)
 
         # Copy website template (clean copy with template files only)
         website_path = copy_website_template(config_yaml, template_content)
