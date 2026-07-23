@@ -98,8 +98,7 @@ def fill_website_template(config_yaml: str,
             '<link rel="icon" href="./favicon.ico" type="image/x-icon" />',
             f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />'
         )
-        favicon_path.unlink()
-        logger.debug("Inlined favicon.ico into index.html and removed from public/")
+        logger.debug("Inlined favicon.ico into index.html")
 
     index_html_path.write_text(index_html_text)
 

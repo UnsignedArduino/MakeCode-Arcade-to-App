@@ -45,7 +45,7 @@ inputs:
 #      type: path
 #      value: "./examples/Racers icon.png"
 
-# Path where we
+# Path where the build process will take place
 build_dir: "./examples/Racers-build"
 
 # You can have multiple outputs
