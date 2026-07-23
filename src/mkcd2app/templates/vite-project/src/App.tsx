@@ -5,16 +5,24 @@ import {
   loadingToast,
   type LoadingToastCallbacks,
 } from "./utils/toasts.ts";
-import { toast } from "react-toastify";
-import { GameConfiguration } from "./gameConfiguration.ts";
-import { positionFixedElement } from "./utils/position.ts";
+import {toast} from "react-toastify";
+import {GameConfiguration} from "./gameConfiguration.ts";
+import {positionFixedElement} from "./utils/position.ts";
 import binaryJs from "./assets/binary.js?raw";
 
 function App(): React.ReactNode {
   const simulatorRef = React.useRef<HTMLIFrameElement>(null);
   const statsRef = React.useRef<HTMLDivElement>(null);
-  const [code, setCode] = React.useState("");
-  const [simState, setSimState] = React.useState<unknown>({});
+  const [simState, setSimState] = React.useState<unknown>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("simState") ?? "{}");
+    } catch (err) {
+      console.warn(
+        `Failed to load sim state, maybe first time run or simState is empty?\n${err}`,
+      );
+      return {};
+    }
+  });
 
   const loadingGameToastCallbacksRef = React.useRef<LoadingToastCallbacks>(
     createEmptyLoadingToastCallbacks(),
@@ -22,20 +30,10 @@ function App(): React.ReactNode {
   const restartGameToastCallbacksRef = React.useRef<LoadingToastCallbacks>(
     createEmptyLoadingToastCallbacks(),
   );
-  const gameCrashToastCloseCallbackRef = React.useRef<() => void>(() => {});
+  const gameCrashToastCloseCallbackRef = React.useRef<() => void>(() => {
+  });
   const [showNoFocusMessage, setShowNoFocusMessage] = React.useState(false);
   const [statsInnerText, setStatsInnerText] = React.useState("");
-
-  React.useEffect(() => {
-    try {
-      setSimState(JSON.parse(localStorage.getItem("simState") ?? "{}"));
-    } catch (err) {
-      console.warn(
-        `Failed to load sim state, maybe first time run or simState is empty?\n${err}`,
-      );
-      setSimState({});
-    }
-  }, []);
 
   React.useEffect(() => {
     localStorage.setItem("simState", JSON.stringify(simState));
@@ -45,20 +43,11 @@ function App(): React.ReactNode {
     loadingGameToastCallbacksRef.current = GameConfiguration.Toasts
       .ENABLE_LOADING_GAME_TOAST
       ? loadingToast(
-          GameConfiguration.Toasts.LOADING_GAME_TOAST_PENDING_MSG,
-          GameConfiguration.Toasts.LOADING_GAME_TOAST_SUCCESS_MSG,
-          GameConfiguration.Toasts.LOADING_GAME_TOAST_ERROR_MSG,
-        )
+        GameConfiguration.Toasts.LOADING_GAME_TOAST_PENDING_MSG,
+        GameConfiguration.Toasts.LOADING_GAME_TOAST_SUCCESS_MSG,
+        GameConfiguration.Toasts.LOADING_GAME_TOAST_ERROR_MSG,
+      )
       : createEmptyLoadingToastCallbacks();
-    console.log(`Loaded ${Math.round(binaryJs.length / 1024)} kb of binary.js`);
-    setCode(binaryJs);
-    if (simulatorRef.current) {
-      simulatorRef.current.src =
-        "---simulator.html?hideSimButtons=1&noExtraPadding=1&fullscreen=1&autofocus=1&nofooter=1";
-    } else {
-      console.error("Simulator iframe ref is null");
-      loadingGameToastCallbacksRef.current.error();
-    }
   }, []);
 
   React.useEffect(() => {
@@ -67,7 +56,7 @@ function App(): React.ReactNode {
       simulatorRef.current?.contentWindow?.postMessage({
         type: "run",
         parts: [],
-        code,
+        code: binaryJs,
         partDefinitions: [],
         // cdnUrl: "https://cdn.makecode.com",
         // version: "",
@@ -83,7 +72,7 @@ function App(): React.ReactNode {
 
     function stopSim() {
       console.log("Stopping simulator");
-      simulatorRef.current?.contentWindow?.postMessage({ type: "stop" });
+      simulatorRef.current?.contentWindow?.postMessage({type: "stop"});
     }
 
     /* eslint-disable */
@@ -104,10 +93,10 @@ function App(): React.ReactNode {
             restartGameToastCallbacksRef.current = GameConfiguration.Toasts
               .ENABLE_RESTARTING_GAME_TOAST
               ? loadingToast(
-                  GameConfiguration.Toasts.RESTARTING_GAME_TOAST_PENDING_MSG,
-                  GameConfiguration.Toasts.RESTARTING_GAME_TOAST_SUCCESS_MSG,
-                  GameConfiguration.Toasts.RESTARTING_GAME_TOAST_ERROR_MSG,
-                )
+                GameConfiguration.Toasts.RESTARTING_GAME_TOAST_PENDING_MSG,
+                GameConfiguration.Toasts.RESTARTING_GAME_TOAST_SUCCESS_MSG,
+                GameConfiguration.Toasts.RESTARTING_GAME_TOAST_ERROR_MSG,
+              )
               : createEmptyLoadingToastCallbacks();
             stopSim();
             gameCrashToastCloseCallbackRef.current();
@@ -142,7 +131,7 @@ function App(): React.ReactNode {
         console.error(data);
         if (GameConfiguration.Toasts.ENABLE_POSSIBLE_GAME_CRASH_TOAST) {
           toast.error(
-            ({ closeToast }) => {
+            ({closeToast}) => {
               gameCrashToastCloseCallbackRef.current = closeToast;
               return (
                 <div>
@@ -158,13 +147,13 @@ function App(): React.ReactNode {
                       restartGameToastCallbacksRef.current = GameConfiguration
                         .Toasts.ENABLE_RESTARTING_GAME_TOAST
                         ? loadingToast(
-                            GameConfiguration.Toasts
-                              .RESTARTING_GAME_TOAST_PENDING_MSG,
-                            GameConfiguration.Toasts
-                              .RESTARTING_GAME_TOAST_SUCCESS_MSG,
-                            GameConfiguration.Toasts
-                              .RESTARTING_GAME_TOAST_ERROR_MSG,
-                          )
+                          GameConfiguration.Toasts
+                            .RESTARTING_GAME_TOAST_PENDING_MSG,
+                          GameConfiguration.Toasts
+                            .RESTARTING_GAME_TOAST_SUCCESS_MSG,
+                          GameConfiguration.Toasts
+                            .RESTARTING_GAME_TOAST_ERROR_MSG,
+                        )
                         : createEmptyLoadingToastCallbacks();
                       stopSim();
                       setTimeout(() => {
@@ -184,10 +173,10 @@ function App(): React.ReactNode {
             },
             {
               autoClose:
-                GameConfiguration.Toasts.POSSIBLE_GAME_CRASH_TOAST_AUTOCLOSE,
+              GameConfiguration.Toasts.POSSIBLE_GAME_CRASH_TOAST_AUTOCLOSE,
               closeOnClick:
-                GameConfiguration.Toasts
-                  .POSSIBLE_GAME_CRASH_TOAST_CLOSE_ON_CLICK,
+              GameConfiguration.Toasts
+                .POSSIBLE_GAME_CRASH_TOAST_CLOSE_ON_CLICK,
             },
           );
         }
@@ -200,7 +189,7 @@ function App(): React.ReactNode {
     return () => {
       window.removeEventListener("message", onMessageHandler, false);
     };
-  }, [code, simState]);
+  }, [simState]);
 
   React.useEffect(() => {
     const checkStatsId = setInterval(() => {
@@ -231,7 +220,7 @@ function App(): React.ReactNode {
     const checkFocusID = setInterval(() => {
       setShowNoFocusMessage(
         !document.hasFocus() ||
-          !simulatorRef.current?.contentDocument?.hasFocus(),
+        !simulatorRef.current?.contentDocument?.hasFocus(),
       );
     }, 100);
 
@@ -243,6 +232,7 @@ function App(): React.ReactNode {
   return (
     <div>
       <iframe
+        src="---simulator.html?hideSimButtons=1&noExtraPadding=1&fullscreen=1&autofocus=1&nofooter=1"
         ref={simulatorRef}
         allowFullScreen
         sandbox="allow-popups allow-forms allow-scripts allow-same-origin"
@@ -255,7 +245,7 @@ function App(): React.ReactNode {
           width: "100%",
           height: "100%",
           backgroundColor:
-            GameConfiguration.FocusDetector.FOCUS_DETECTOR_BACKGROUND_COLOR,
+          GameConfiguration.FocusDetector.FOCUS_DETECTOR_BACKGROUND_COLOR,
           pointerEvents: "none",
           zIndex: 1001,
         }}
@@ -270,7 +260,7 @@ function App(): React.ReactNode {
             fontFamily: "monospace",
             textAlign: "center",
             color:
-              GameConfiguration.FocusDetector.FOCUS_DETECTOR_FOREGROUND_COLOR,
+            GameConfiguration.FocusDetector.FOCUS_DETECTOR_FOREGROUND_COLOR,
             fontSize: GameConfiguration.FocusDetector.FOCUS_DETECTOR_FONT_SIZE,
             pointerEvents: "none",
           }}
