@@ -10,13 +10,15 @@
     "format": "prettier --check .",
     "writeFormat": "prettier --write .",
     "preview": "vite preview",
-    "build": "tsc -b && vite build"
+    "build": "tsc -b && vite build",
+    "build:singlefile": "tsc -b && vite build --mode singlefile"
   },
   "dependencies": {
     "prettier": "^3.9.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-toastify": "^11.1.0"
+    "react-toastify": "^11.1.0",
+    "vite-plugin-singlefile": "^2.3.3"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",

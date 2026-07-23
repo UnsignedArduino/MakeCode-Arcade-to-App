@@ -1,11 +1,20 @@
 import {defineConfig} from "vite";
 import react, {reactCompilerPreset} from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
+import {viteSingleFile} from "vite-plugin-singlefile";
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), babel({presets: [reactCompilerPreset()]})],
+export default defineConfig(({mode}) => ({
+  plugins: [
+    react(),
+    babel({presets: [reactCompilerPreset()]}),
+    ...(mode === "singlefile" ? [viteSingleFile()] : []),
+  ],
+  cacheDir: process.env.VITE_CACHE_DIR ?? "node_modules/.vite",
   build: {
+    outDir: process.env.VITE_OUT_DIR ?? "dist",
+    emptyOutDir: true,
+    cssCodeSplit: mode !== "singlefile",
     rolldownOptions: {
       output: {
         codeSplitting: {
@@ -23,4 +32,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
