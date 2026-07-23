@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import shutil
@@ -48,11 +49,7 @@ def fill_website_template(config_yaml: str,
                           bin_js_path: ContentFile,
                           support_path: ContentDir) -> ContentDir:
     """
-    "Fill" the website template — copy binary.js and support files into ``public/``
-    and update the ``<title>``.
-
-    We copy the deps-installed website first so we never mutate a ContentDir
-    that another task owns.
+    "Fill" the website template
 
     Example intput: racers-website
     Example output: racers-website-filled
@@ -91,6 +88,18 @@ def fill_website_template(config_yaml: str,
     index_html_text = index_html_path.read_text()
     index_html_text = index_html_text.replace("<title>vite-project</title>",
                                               f"<title>{title}</title>")
+
+    favicon_path = public_path / "favicon.ico"
+    if favicon_path.exists():
+        favicon_b64 = base64.b64encode(favicon_path.read_bytes()).decode("ascii")
+        favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"
+        index_html_text = index_html_text.replace(
+            '<link rel="icon" href="./favicon.ico" type="image/x-icon" />',
+            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />'
+        )
+        favicon_path.unlink()
+        logger.debug("Inlined favicon.ico into index.html and removed from public/")
+
     index_html_path.write_text(index_html_text)
 
     logger.debug("Updating package.json")
