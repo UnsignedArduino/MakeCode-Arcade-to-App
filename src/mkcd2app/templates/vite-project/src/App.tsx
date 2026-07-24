@@ -144,7 +144,7 @@ function App(): React.ReactNode {
             ({closeToast}) => {
               gameCrashToastCloseCallbackRef.current = closeToast;
               return (
-                <div>
+                <div className="game-container">
                   {
                     GameConfiguration.Toasts
                       .POSSIBLE_GAME_CRASH_TOAST_BEGINNING_MSG
