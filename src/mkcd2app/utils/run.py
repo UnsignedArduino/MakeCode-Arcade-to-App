@@ -11,7 +11,12 @@ logger = create_logger(name=__name__, level=logging.INFO)
 
 class BuildError(Exception):
     def __init__(self, command, cwd, returncode, output):
-        self.command, self.cwd, self.returncode, self.output = command, cwd, returncode, output
+        self.command, self.cwd, self.returncode, self.output = (
+            command,
+            cwd,
+            returncode,
+            output,
+        )
         super().__init__(f"{command} failed ({returncode}) in {cwd}")
 
 
@@ -37,8 +42,9 @@ def run_cmd(command: list[str], cwd: Path | str) -> str:
         )
     cmd_list = [resolved, *command[1:]]
     logger.debug(f"Running {command} in {cwd}")
-    proc = subprocess.run(cmd_list, shell=False, cwd=cwd, capture_output=True,
-                          text=True)
+    proc = subprocess.run(
+        cmd_list, shell=False, cwd=cwd, capture_output=True, text=True, check=False
+    )
     if proc.returncode != 0:
         raise BuildError(command, cwd, proc.returncode, proc.stdout + proc.stderr)
     return proc.stdout

@@ -44,10 +44,12 @@ def copy_website_template(config_yaml: str, template_src: ContentDir) -> Content
 
 
 @task(namespace="mkcd2app")
-def fill_website_template(config_yaml: str,
-                          website_path: ContentDir,
-                          bin_js_path: ContentFile,
-                          support_path: ContentDir) -> ContentDir:
+def fill_website_template(
+    config_yaml: str,
+    website_path: ContentDir,
+    bin_js_path: ContentFile,
+    support_path: ContentDir,
+) -> ContentDir:
     """
     "Fill" the website template
 
@@ -81,14 +83,17 @@ def fill_website_template(config_yaml: str,
     logger.debug(f"Copying ---simulator.html from {simulator_html_path}")
     shutil.copy(simulator_html_path, asset_path)
 
-    title = config.project.title.format(NAME=config.project.name,
-                                        VERSION=config.project.version,
-                                        AUTHOR=config.project.author)
-    logger.debug(f"Using title \"{title}\" in index.html")
+    title = config.project.title.format(
+        NAME=config.project.name,
+        VERSION=config.project.version,
+        AUTHOR=config.project.author,
+    )
+    logger.debug(f'Using title "{title}" in index.html')
     index_html_path = dst / "index.html"
     index_html_text = index_html_path.read_text()
-    index_html_text = index_html_text.replace("<title>vite-project</title>",
-                                              f"<title>{title}</title>")
+    index_html_text = index_html_text.replace(
+        "<title>vite-project</title>", f"<title>{title}</title>"
+    )
 
     favicon_path = Path(support_path.path) / "favicon.ico"
     if favicon_path.exists():
@@ -96,7 +101,7 @@ def fill_website_template(config_yaml: str,
         favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"
         index_html_text = index_html_text.replace(
             '<link rel="icon" href="./favicon.ico" type="image/x-icon" />',
-            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />'
+            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />',
         )
         logger.debug("Inlined favicon.ico into index.html")
 
@@ -108,9 +113,7 @@ def fill_website_template(config_yaml: str,
     package_json["name"] = config.project.path_friendly_name
     package_json["version"] = config.project.version
     package_json["description"] = config.project.description
-    package_json["authors"] = {
-        "name": config.project.author
-    }
+    package_json["authors"] = {"name": config.project.author}
     package_json_path.write_text(json.dumps(package_json, indent=2))
 
     logger.debug("Website template filled")
@@ -130,11 +133,11 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
 
     :param website_filled_path: A redun.ContentDir pointing to the template website.
     :return: A redun.ContentDir pointing to the directory of static HTML/CSS/JS files
-     ready to serve. 
+     ready to serve.
     """
     src = Path(website_filled_path.path)
     dst = src.parent / f"{src.name}-built"
-    logger.info(f"Installing website dependencies and building to static HTML/CSS/JS")
+    logger.info("Installing website dependencies and building to static HTML/CSS/JS")
 
     if dst.exists():
         shutil.rmtree(dst)
@@ -155,7 +158,8 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
 
 @task(namespace="mkcd2app")
 def install_deps_and_build_website_singlefile(
-        website_filled_path: ContentDir) -> ContentFile:
+    website_filled_path: ContentDir,
+) -> ContentFile:
     """
     Make a copy of the template website, then ``npm ci`` and `npm run build:singlefile` in it.
 
@@ -170,7 +174,7 @@ def install_deps_and_build_website_singlefile(
     """
     src = Path(website_filled_path.path)
     dst = src.parent / f"{src.name}-singlefile-built"
-    logger.info(f"Installing website dependencies and building to static HTML file")
+    logger.info("Installing website dependencies and building to static HTML file")
 
     if dst.exists():
         shutil.rmtree(dst)

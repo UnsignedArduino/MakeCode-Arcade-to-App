@@ -23,3 +23,8 @@ mkcd2app = "mkcd2app.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mkcd2app"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
+]

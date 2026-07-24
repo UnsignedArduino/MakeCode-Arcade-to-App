@@ -6,8 +6,13 @@ _orig_get_proto = redun.file.get_proto
 
 
 def _patched_get_proto(url: str | None = None) -> str:
-    if url and len(url) >= 3 and url[1] == ":" and url[0].isalpha() and url[2] in ("\\",
-                                                                                   "/"):
+    if (
+        url
+        and len(url) >= 3
+        and url[1] == ":"
+        and url[0].isalpha()
+        and url[2] in ("\\", "/")
+    ):
         return "local"
     return _orig_get_proto(url)
 
@@ -24,6 +29,7 @@ def _content_dir_calc_hash(self, files=None):
     if files is None:
         files = list(self)
     from redun.hashing import hash_struct
+
     return hash_struct([self.type_basename, self.path] + sorted(f.hash for f in files))
 
 
@@ -37,6 +43,7 @@ redun.file.ContentDir._calc_hash = _content_dir_calc_hash
 # via ContentDir gives properly content-based hashing.
 def _dir_calc_hash(self, files=None):
     from redun.file import ContentDir
+
     return ContentDir(self.path)._calc_hash()
 
 
@@ -44,5 +51,6 @@ redun.file.Dir._calc_hash = _dir_calc_hash
 
 
 def assert_pinned_redun_version():
-    assert redun.__version__ == "0.44.1", ("compat patches assume this exact redun "
-                                           "version; verify before bumping")
+    assert redun.__version__ == "0.44.1", (
+        "compat patches assume this exact redun version; verify before bumping"
+    )

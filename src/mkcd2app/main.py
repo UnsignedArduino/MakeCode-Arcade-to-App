@@ -46,10 +46,12 @@ def main():
         db_uri = f"sqlite:///{build_dir.resolve() / '.redun-cache.db'}"
         logger.debug(f"redun cache DB: {db_uri}")
         # noinspection PyUnresolvedReferences
-        redun_config = redun.config.Config({
-            "scheduler": {"log_level": "DEBUG"},
-            "backend": {"db_uri": db_uri},
-        })
+        redun_config = redun.config.Config(
+            {
+                "scheduler": {"log_level": "DEBUG"},
+                "backend": {"db_uri": db_uri},
+            }
+        )
         scheduler = Scheduler(config=redun_config)
         # Load/migrate the backend so the persistent DB is properly set up.
         # Without this, providing a custom db_uri skips the automatic
@@ -61,8 +63,9 @@ def main():
         if results.static:
             logger.info(f"Static website directory is at {results.static.path}")
         if results.static_singlefile:
-            logger.info(f"Static single-file HTML is at "
-                        f"{results.static_singlefile.path}")
+            logger.info(
+                f"Static single-file HTML is at {results.static_singlefile.path}"
+            )
 
 
 if __name__ == "__main__":

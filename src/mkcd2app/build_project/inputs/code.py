@@ -4,15 +4,19 @@ from io import BytesIO
 from pathlib import Path
 
 import requests
-from PIL import Image
 from bs4 import BeautifulSoup
+from PIL import Image
 from redun import task
 from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import load_config_from_yaml
-from mkcd2app.config.model import GitHubCodeSource, PathAssetSource, PathCodeSource, \
-    ShareLinkCodeSource, \
-    UrlAssetSource
+from mkcd2app.config.model import (
+    GitHubCodeSource,
+    PathAssetSource,
+    PathCodeSource,
+    ShareLinkCodeSource,
+    UrlAssetSource,
+)
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.run import run_cmd
 
@@ -83,7 +87,9 @@ def build_binary_js(config_yaml: str, code_path: ContentDir) -> ContentFile:
 
     # Copy binary to a stable location outside code_dir so we don't
     # pollute fetch_code's ContentDir hash on subsequent runs.
-    output_path = cwd.parent / f"{config.project.path_friendly_name}-binary-js" / "binary.js"
+    output_path = (
+        cwd.parent / f"{config.project.path_friendly_name}-binary-js" / "binary.js"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(bin_js_path, output_path)
     shutil.rmtree(cwd / "built")
@@ -104,8 +110,10 @@ def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
      to the website's public folder as is alongside the binary.js file.
     """
     config = load_config_from_yaml(config_yaml)
-    support_path = Path(
-        config.build_dir) / f"{config.project.path_friendly_name}-binary-js-support"
+    support_path = (
+        Path(config.build_dir)
+        / f"{config.project.path_friendly_name}-binary-js-support"
+    )
     logger.info(f"Downloading supporting files to {support_path}")
 
     # Clean previous output, not wasteful because redun handles caching
@@ -113,13 +121,14 @@ def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
         shutil.rmtree(support_path)
     support_path.mkdir(parents=True)
 
-    logger.debug(f"Downloading main simulator file")
+    logger.debug("Downloading main simulator file")
     res = requests.get("https://trg-arcade.userpxt.io/---simulator")
     res.raise_for_status()
     sim_html = res.text
 
-    logger.debug(f"Analyzing sim HTML ({len(sim_html)} chars) for required CSS and JS "
-                 f"files")
+    logger.debug(
+        f"Analyzing sim HTML ({len(sim_html)} chars) for required CSS and JS files"
+    )
     soup = BeautifulSoup(sim_html, features="html.parser")
     css_links = soup.find_all("link", rel="stylesheet")
     js_scripts = soup.find_all("script")

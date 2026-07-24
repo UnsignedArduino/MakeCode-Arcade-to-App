@@ -1,9 +1,9 @@
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, RootModel
 
-
 # Source code can be a share link, GitHub repo, or a path on disk
+
 
 class ShareLinkCodeSource(BaseModel):
     type: Literal["share_link"]
@@ -23,13 +23,14 @@ class PathCodeSource(BaseModel):
 
 CodeSource = RootModel[
     Annotated[
-        Union[ShareLinkCodeSource, GitHubCodeSource, PathCodeSource],
-        Field(discriminator="type")
+        ShareLinkCodeSource | GitHubCodeSource | PathCodeSource,
+        Field(discriminator="type"),
     ]
 ]
 
 
 # Assets can be a URL or path on disk
+
 
 class UrlAssetSource(BaseModel):
     type: Literal["url"]
@@ -42,16 +43,13 @@ class PathAssetSource(BaseModel):
 
 
 AssetSource = RootModel[
-    Annotated[
-        Union[UrlAssetSource, PathAssetSource],
-        Field(discriminator="type")
-    ]
+    Annotated[UrlAssetSource | PathAssetSource, Field(discriminator="type")]
 ]
 
 
 # Right now we only have one asset so far, just the icon
 class Assets(BaseModel):
-    icon: Optional[AssetSource] = None
+    icon: AssetSource | None = None
 
 
 # To build a project, we need multiple inputs
@@ -64,7 +62,7 @@ class Inputs(BaseModel):
 class Project(BaseModel):
     name: str
     path_friendly_name: str
-    description: Optional[str] = None
+    description: str | None = None
     author: str
     version: str
     title: str = "{NAME} v{VERSION}"
@@ -88,19 +86,19 @@ class StaticSinglefileOutput(BaseModel):
 
 class ElectronOutput(BaseModel):
     type: Literal["electron"]
-    window: Optional[WindowConfig] = None
+    window: WindowConfig | None = None
 
 
 class TauriOutput(BaseModel):
     type: Literal["tauri"]
     identifier: str
-    window: Optional[WindowConfig] = None
+    window: WindowConfig | None = None
 
 
 OutputOption = RootModel[
     Annotated[
-        Union[StaticOutput, StaticSinglefileOutput, ElectronOutput, TauriOutput],
-        Field(discriminator="type")
+        StaticOutput | StaticSinglefileOutput | ElectronOutput | TauriOutput,
+        Field(discriminator="type"),
     ]
 ]
 
@@ -111,7 +109,7 @@ class BuildConfig(BaseModel):
     project: Project
     inputs: Inputs
     build_dir: str = Field(..., alias="build_dir")
-    outputs: List[OutputOption]
+    outputs: list[OutputOption]
 
     class Config:
         populate_by_name = True
