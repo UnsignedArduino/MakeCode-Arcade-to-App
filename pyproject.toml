@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mkcd2app"
+version = "0.1.0"
+description = "Convert MakeCode Arcade games into static websites, Electron, or Tauri apps"
+readme = "README.md"
+requires-python = ">=3.14"
+# We are pinning redun because we monkey patch something
+dependencies = [
+    "pydantic",
+    "pyyaml",
+    "redun==0.44.1",
+    "requests",
+    "beautifulsoup4",
+    "pillow",
+]
+
+[project.scripts]
+mkcd2app = "mkcd2app.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mkcd2app"]

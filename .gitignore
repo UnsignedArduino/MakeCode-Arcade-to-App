@@ -1,8 +1,7 @@
 .venv
-node_modules
-.idea
 __pycache__/
 *.pyc
 examples/*
 !examples/*.yaml
 !examples/*.png
+.idea
