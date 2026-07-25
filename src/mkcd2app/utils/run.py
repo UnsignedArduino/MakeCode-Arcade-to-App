@@ -10,14 +10,16 @@ logger = create_logger(name=__name__, level=logging.INFO)
 
 
 class BuildError(Exception):
-    def __init__(self, command, cwd, returncode, output):
+    def __init__(
+        self, command: list[str], cwd: Path | str, return_code: int, output: str
+    ) -> None:
         self.command, self.cwd, self.returncode, self.output = (
             command,
             cwd,
-            returncode,
+            return_code,
             output,
         )
-        super().__init__(f"{command} failed ({returncode}) in {cwd}")
+        super().__init__(f"{command} failed ({return_code}) in {cwd}")
 
 
 def run_cmd(command: list[str], cwd: Path | str) -> str:

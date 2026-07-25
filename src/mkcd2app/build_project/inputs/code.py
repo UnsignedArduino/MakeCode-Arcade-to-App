@@ -137,7 +137,7 @@ def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
         url = css.get("href")
         if url:
             logger.debug(f"Downloading CSS file {url}")
-            res = requests.get(url)
+            res = requests.get(str(url))
             res.raise_for_status()
             style_tag = soup.new_tag("style")
             style_tag.string = res.text
@@ -147,7 +147,7 @@ def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
         url = js.get("src")
         if url:
             logger.debug(f"Downloading JS file {url}")
-            res = requests.get(url)
+            res = requests.get(str(url))
             res.raise_for_status()
             js.string = res.text
             del js["src"]
@@ -159,13 +159,13 @@ def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
 
     if config.inputs.assets.icon:
         match config.inputs.assets.icon.root:
-            case UrlAssetSource(value=url):
+            case UrlAssetSource(value=url):  # type: ignore[misc]
                 logger.debug(f"Downloading icon from {url}")
                 res = requests.get(str(url))
                 res.raise_for_status()
                 buffer = BytesIO(res.content)
                 im = Image.open(buffer)
-            case PathAssetSource(value=path):
+            case PathAssetSource(value=path):  # type: ignore[misc]
                 logger.debug(f"Opening icon from {path}")
                 im = Image.open(path)
         favicon_path = support_path / "favicon.ico"

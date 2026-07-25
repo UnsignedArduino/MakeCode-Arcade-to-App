@@ -14,7 +14,7 @@ from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def main():
+def main() -> None:
     args = generate_and_parse_args()
     debug = bool(args.debug)
     if debug:

@@ -43,7 +43,7 @@ def create_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def set_all_stdout_logger_levels(level: int):
+def set_all_stdout_logger_levels(level: int) -> None:
     """
     Sets the logging level of all loggers that point to standard output.
 
