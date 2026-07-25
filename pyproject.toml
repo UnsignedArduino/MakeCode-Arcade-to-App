@@ -26,5 +26,14 @@ packages = ["src/mkcd2app"]
 
 [dependency-groups]
 dev = [
+    "mypy>=2.3.0",
     "ruff>=0.16.0",
+    "types-pyyaml>=6.0.12.20260724",
 ]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
