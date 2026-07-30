@@ -46,7 +46,6 @@ def fetch_code(config_yaml: str, node_modules_for_mkc: ContentDir) -> ContentDir
     if code_path.exists():
         rmtree_robust(code_path)
 
-    # TODO: Implement source code download from GitHub
     match config.inputs.code.root:
         case ShareLinkCodeSource(value=url):
             logger.debug(f"Downloading source code from {url}")
@@ -54,8 +53,21 @@ def fetch_code(config_yaml: str, node_modules_for_mkc: ContentDir) -> ContentDir
             logger.debug(f"Using `mkc` from {node_modules_for_mkc}")
             run_cmd(["npx", "mkc", "download", str(url)], cwd=code_path)
         case GitHubCodeSource(value=url, checkout=checkout_target):
-            logger.debug(f"Downloading source code from {url}@{checkout_target}")
-            raise NotImplementedError("GitHub code source not implemented yet")
+            logger.debug(f"Cloning source code from {url}@{checkout_target}")
+            abs_code_path = code_path.resolve()
+            abs_code_path.parent.mkdir(parents=True, exist_ok=True)
+            run_cmd(
+                [
+                    "git",
+                    "clone",
+                    "--filter=blob:none",
+                    "--no-checkout",
+                    str(url),
+                    str(abs_code_path),
+                ],
+                cwd=abs_code_path.parent,
+            )
+            run_cmd(["git", "checkout", checkout_target], cwd=abs_code_path)
         case PathCodeSource(value=path):
             logger.debug(f"Copying source code from {path}")
             shutil.copytree(path, code_path)
