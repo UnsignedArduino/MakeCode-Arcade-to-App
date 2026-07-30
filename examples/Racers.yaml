@@ -19,19 +19,19 @@ project:
   title: "{NAME} v{VERSION}"
 
 inputs:
+  # Can be share_link, github, or path
   code:
-    # Can be share_link, github, or path
     type: share_link
     value: https://arcade.makecode.com/84426-33815-03715-00484
 
-  #  code:
-  #    type: github
-  #    value: https://github.com/UnsignedArduino/Racers
-  #    checkout: master
+#  code:
+#    type: github
+#    value: https://github.com/UnsignedArduino/Racers
+#    checkout: master
 
-  #  code:
-  #    type: path
-  #    value: "E:/Racers"
+#  code:
+#    type: path
+#    value: "E:/Racers"
 
   assets:
     # Icon is optional but highly recommended, it will be used as the favicon

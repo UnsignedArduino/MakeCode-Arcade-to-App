@@ -18,6 +18,7 @@ from mkcd2app.config.model import (
     UrlAssetSource,
 )
 from mkcd2app.utils.logger import create_logger
+from mkcd2app.utils.paths import rmtree_robust
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
@@ -43,10 +44,9 @@ def fetch_code(config_yaml: str, node_modules_for_mkc: ContentDir) -> ContentDir
     # Clean previous output, not wasteful because redun already checks our inputs
     # and outputs to see if they changed
     if code_path.exists():
-        shutil.rmtree(code_path)
+        rmtree_robust(code_path)
 
     # TODO: Implement source code download from GitHub
-    # TODO: Implement source code copy
     match config.inputs.code.root:
         case ShareLinkCodeSource(value=url):
             logger.debug(f"Downloading source code from {url}")
@@ -55,8 +55,10 @@ def fetch_code(config_yaml: str, node_modules_for_mkc: ContentDir) -> ContentDir
             run_cmd(["npx", "mkc", "download", str(url)], cwd=code_path)
         case GitHubCodeSource(value=url, checkout=checkout_target):
             logger.debug(f"Downloading source code from {url}@{checkout_target}")
+            raise NotImplementedError("GitHub code source not implemented yet")
         case PathCodeSource(value=path):
             logger.debug(f"Copying source code from {path}")
+            shutil.copytree(path, code_path)
 
     logger.debug("Source code downloaded")
     return ContentDir(str(code_path))
