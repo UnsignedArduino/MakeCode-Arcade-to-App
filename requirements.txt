@@ -1,4 +1,0 @@
-pyyaml
-requests
-beautifulsoup4
-pillow
