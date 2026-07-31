@@ -1,0 +1,55 @@
+# Example configuration file for MakeCode Arcade to App to compile to static
+# HTML, CSS, and JS files
+
+# Config version (single number, incremented if breaking change to schema is
+# made)
+version: 1
+
+project:
+  name: Empty Game
+  path_friendly_name: empty-game
+  description: "Empty game used for E2E testing"
+  author: Cyrus Yiu
+  version: 0.0.1
+  # This is what the window title will be
+  # This will also be used for the executable file name for Electron outputs
+  # You can use {NAME} or {VERSION} or {AUTHOR} to substitute the correct
+  # values
+  title: "{NAME} v{VERSION}"
+
+inputs:
+  # Can be share_link, github, or path
+  code:
+    type: path
+    value: "tests/fixtures/empty_game"
+
+  assets: {}
+    # Icon is optional but highly recommended, it will be used as the favicon
+    # and app icon
+#    icon:
+#       Can be url or path
+#      type: url
+#      value: https://raw.githubusercontent.com/UnsignedArduino/MakeCode-Arcade-to-App/refs/heads/main/examples/Racers%20icon.png
+
+#    icon:
+#      type: path
+#      value: "./examples/Racers icon.png"
+
+# Path where the build process will take place
+build_dir: "./examples/testing/empty_game_build"
+
+# You can have multiple outputs
+# Currently available options are static, static-singlefile, electron, and
+# tauri
+outputs:
+  - type: static
+  - type: static-singlefile
+#  - type: electron
+#    window:
+#      width: 640
+#      height: 480
+#  - type: tauri
+#    identifier: com.unsignedarduino.racers
+#    window:
+#      width: 640
+#      height: 480

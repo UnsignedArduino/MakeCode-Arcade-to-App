@@ -1,0 +1,21 @@
+{
+    "name": "test",
+    "description": "",
+    "dependencies": {
+        "device": "*"
+    },
+    "files": [
+        "main.blocks",
+        "main.ts",
+        "README.md",
+        "assets.json"
+    ],
+    "targetVersions": {
+        "branch": "stable4.0",
+        "tag": "v4.0.14",
+        "commits": "https://github.com/microsoft/pxt-arcade/commits/a33ec9537bc6c5fada2a3b02aac57a4bc9a10803",
+        "target": "4.0.14",
+        "pxt": "12.2.34"
+    },
+    "preferredEditor": "blocksprj"
+}

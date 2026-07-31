@@ -2,8 +2,11 @@ name: CI
 on: [ push, pull_request ]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+  e2e:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
@@ -22,11 +25,5 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run ruff linter check
-        run: uv run ruff check .
-
-      - name: Run ruff format check
-        run: uv run ruff format --check .
-
-      - name: Run mypy check
-        run: uv run mypy .
+      - name: Run tests with pytest
+        run: uv run pytest

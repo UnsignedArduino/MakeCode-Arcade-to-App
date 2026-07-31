@@ -28,6 +28,8 @@ packages = ["src/mkcd2app"]
 dev = [
     "mypy>=2.3.0",
     "pre-commit>=4.6.1",
+    "pytest>=9.1.1",
+    "pytest-timeout>=2.4.0",
     "ruff>=0.16.0",
     "types-pyyaml>=6.0.12.20260724",
 ]
