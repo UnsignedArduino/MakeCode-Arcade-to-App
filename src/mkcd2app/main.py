@@ -2,7 +2,10 @@ import logging
 from pathlib import Path
 
 from mkcd2app.cli import generate_and_parse_args
+from mkcd2app.toolchains.install import install_toolchain
 from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
+from mkcd2app.utils.paths import get_redun_db_for_toolchain_path
+from mkcd2app.utils.run_redun_task import run_redun_task
 
 logger = create_logger(name=__name__, level=logging.INFO)
 
@@ -18,6 +21,10 @@ def main() -> None:
         if args.toolchain_command == "install":
             logger.debug("Installing MakeCode CLI toolchain")
 
+            run_redun_task(
+                expr=install_toolchain(),
+                redun_db_path=get_redun_db_for_toolchain_path(),
+            )
         elif args.toolchain_command == "status":
             logger.debug("Checking MakeCode CLI toolchain status")
 

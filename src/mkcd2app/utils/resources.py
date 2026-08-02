@@ -5,8 +5,10 @@ from pathlib import Path
 
 
 @contextmanager
-def get_template_path(name: str) -> Iterator[Path]:
-    ref = files("mkcd2app").joinpath("resources", "templates", name)
+def get_template_path(name: str | None = None) -> Iterator[Path]:
+    ref = files("mkcd2app").joinpath("resources", "templates")
+    if name:
+        ref.joinpath(name)
     with as_file(ref) as path:
         yield path
 

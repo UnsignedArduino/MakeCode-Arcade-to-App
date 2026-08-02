@@ -17,8 +17,8 @@ from mkcd2app.config.model import (
     ShareLinkCodeSource,
     UrlAssetSource,
 )
+from mkcd2app.utils.filesystem import rmtree_robust
 from mkcd2app.utils.logger import create_logger
-from mkcd2app.utils.paths import rmtree_robust
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
