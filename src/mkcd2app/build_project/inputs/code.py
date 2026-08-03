@@ -10,7 +10,7 @@ from redun import task
 from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import load_config_from_yaml
-from mkcd2app.config.model import (
+from mkcd2app.models.config import (
     GitHubCodeSource,
     PathAssetSource,
     PathCodeSource,
@@ -173,15 +173,15 @@ def download_and_mod_supporting_files(config_yaml: str) -> ContentDir:
 
     if config.inputs.assets.icon:
         match config.inputs.assets.icon.root:
-            case UrlAssetSource(value=url):  # type: ignore[misc]
-                logger.debug(f"Downloading icon from {url}")
-                res = requests.get(str(url))
+            case UrlAssetSource(value=icon_url):
+                logger.debug(f"Downloading icon from {icon_url}")
+                res = requests.get(str(icon_url))
                 res.raise_for_status()
                 buffer = BytesIO(res.content)
                 im = Image.open(buffer)
-            case PathAssetSource(value=path):  # type: ignore[misc]
-                logger.debug(f"Opening icon from {path}")
-                im = Image.open(path)
+            case PathAssetSource(value=icon_path):
+                logger.debug(f"Opening icon from {icon_path}")
+                im = Image.open(icon_path)
         favicon_path = support_path / "favicon.ico"
         logger.debug(f"Saving favicon to {favicon_path}")
         im.save(favicon_path)

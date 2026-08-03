@@ -9,7 +9,10 @@ from redun.file import ContentDir
 
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.paths import get_js_tools_dir, get_templates_npm_cache_dir
-from mkcd2app.utils.resources import get_js_tools_path, get_template_path
+from mkcd2app.utils.resources import (
+    get_resource_js_tools_path,
+    get_resource_template_path,
+)
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
@@ -69,6 +72,7 @@ def warm_npm_cache_for_templates(templates: ContentDir) -> ContentDir:
             tmp_dir_path = Path(tmp_dir)
             logger.debug(f"Copying {template} to {tmp_dir_path}")
             shutil.copytree(template, tmp_dir_path, dirs_exist_ok=True)
+
             logger.debug("Caching npm packages")
             run_cmd(
                 ["npm", "ci", "--cache", str(cache_path), "--prefer-online"],
@@ -83,12 +87,14 @@ def warm_npm_cache_for_templates(templates: ContentDir) -> ContentDir:
 def install_toolchain() -> tuple[ContentDir, ContentDir]:
     """
     Install the toolchain for this mkcd2app version.
+    :return: A tuple of two ContentDirs, where the first one is the node_modules folder
+     for the JS tools, and the other one is the cache directory for the templates.
     """
     logger.info("Installing toolchain")
 
     with ExitStack() as stack:
-        js_tools_path = stack.enter_context(get_js_tools_path())
-        templates_path = stack.enter_context(get_template_path())
+        js_tools_path = stack.enter_context(get_resource_js_tools_path())
+        templates_path = stack.enter_context(get_resource_template_path())
 
         # `npm ci` the necessary tools (`mkc` CLI itself)
         js_tools_node_modules = install_js_tools(ContentDir(str(js_tools_path)))
