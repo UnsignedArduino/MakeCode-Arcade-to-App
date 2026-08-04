@@ -8,7 +8,10 @@ from redun import task
 from redun.file import ContentDir
 
 from mkcd2app.utils.logger import create_logger
-from mkcd2app.utils.paths import get_js_tools_dir, get_templates_npm_cache_dir
+from mkcd2app.utils.paths import (
+    get_js_tools_dir,
+    get_templates_npm_cache_dir,
+)
 from mkcd2app.utils.resources import (
     get_resource_js_tools_path,
     get_resource_template_path,

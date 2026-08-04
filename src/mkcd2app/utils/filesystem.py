@@ -22,6 +22,4 @@ def _remove_readonly(
 
 
 def rmtree_robust(path: Path) -> None:
-    if not path.exists():
-        return
     shutil.rmtree(path, onerror=_remove_readonly)

@@ -7,6 +7,7 @@ from mkcd2app.cli import generate_and_parse_args
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.target.install import install_target
 from mkcd2app.toolchains.install import install_toolchain
+from mkcd2app.toolchains.uninstall import uninstall_toolchain
 from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
 from mkcd2app.utils.paths import (
     get_redun_db_for_target_path,
@@ -38,6 +39,12 @@ def main() -> None:
 
         elif args.toolchain_command == "uninstall":
             logger.debug("Uninstalling MakeCode CLI toolchain")
+            # noinspection none-function-assignment
+            run_redun_task(
+                expr=uninstall_toolchain(),
+                redun_db_path=get_redun_db_for_toolchain_path(),
+            )
+            logger.debug("Toolchain uninstalled")
     elif args.command == "target":
         if args.target_command == "install":
             install_version: str = args.version
