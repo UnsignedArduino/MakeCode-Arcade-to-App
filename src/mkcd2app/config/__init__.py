@@ -2,7 +2,7 @@ import logging
 
 import yaml
 
-from mkcd2app.config.model import BuildConfig
+from mkcd2app.models.config import BuildConfig
 from mkcd2app.utils.logger import create_logger
 
 logger = create_logger(name=__name__, level=logging.INFO)

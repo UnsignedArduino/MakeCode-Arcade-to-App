@@ -2,14 +2,20 @@ import logging
 import shutil
 from pathlib import Path
 
-import redun
-import redun.file
-from redun import Scheduler
-
 from mkcd2app.build_project import BuildProjectResult, build_project
 from mkcd2app.cli import generate_and_parse_args
 from mkcd2app.config import load_config_from_yaml
+from mkcd2app.target.install import install_target
+from mkcd2app.target.uninstall import uninstall_target
+from mkcd2app.toolchain.install import install_toolchain
+from mkcd2app.toolchain.uninstall import uninstall_toolchain
 from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
+from mkcd2app.utils.paths import (
+    get_redun_db_for_target_path,
+    get_redun_db_for_toolchain_path,
+)
+from mkcd2app.utils.run_redun_task import run_redun_task
+from mkcd2app.utils.text import raise_for_invalid_strict_semver
 
 logger = create_logger(name=__name__, level=logging.INFO)
 
@@ -21,11 +27,55 @@ def main() -> None:
         set_all_stdout_logger_levels(logging.DEBUG)
     logger.debug(f"Received arguments: {args}")
 
-    if args.command == "build":
-        logger.debug("Building project")
+    if args.command == "toolchain":
+        if args.toolchain_command == "install":
+            logger.debug("Installing MakeCode CLI toolchain")
+            run_redun_task(
+                expr=install_toolchain(),
+                redun_db_path=get_redun_db_for_toolchain_path(),
+            )
+            logger.debug("Toolchain installed")
+        elif args.toolchain_command == "status":
+            logger.debug("Checking MakeCode CLI toolchain status")
 
+        elif args.toolchain_command == "uninstall":
+            logger.debug("Uninstalling MakeCode CLI toolchain")
+            # noinspection none-function-assignment
+            run_redun_task(
+                expr=uninstall_toolchain(),
+                redun_db_path=get_redun_db_for_toolchain_path(),
+            )
+            logger.debug("Toolchain uninstalled")
+    elif args.command == "target":
+        if args.target_command == "install":
+            install_version: str = args.version
+            raise_for_invalid_strict_semver(install_version)
+            logger.debug(f"Installing MakeCode CLI target version {install_version}")
+            run_redun_task(
+                expr=install_target(install_version),
+                redun_db_path=get_redun_db_for_target_path(),
+            )
+            logger.debug(f"Target {install_version} installed")
+        elif args.target_command == "list":
+            logger.debug("Listing MakeCode CLI target")
+
+        elif args.target_command == "uninstall":
+            uninstall_version: str = args.version
+            raise_for_invalid_strict_semver(uninstall_version)
+            logger.debug(
+                f"Uninstalling MakeCode CLI target version {uninstall_version}"
+            )
+            # noinspection none-function-assignment
+            run_redun_task(
+                expr=uninstall_target(uninstall_version),
+                redun_db_path=get_redun_db_for_target_path(),
+            )
+            logger.debug(f"Target {uninstall_version} uninstalled")
+
+    elif args.command == "build":
         config_path = Path(args.config)
-        logger.debug(f"Loading config from {config_path}")
+        logger.debug(f"Building project with config {config_path}")
+
         config_text = config_path.read_text()
 
         # Parse once only to extract build_dir for the redun DB path.
@@ -42,24 +92,10 @@ def main() -> None:
             else:
                 logger.debug("Build directory does not exist; nothing to clear")
 
-        build_dir.mkdir(parents=True, exist_ok=True)
-        db_uri = f"sqlite:///{build_dir.resolve() / '.redun-cache.db'}"
-        logger.debug(f"redun cache DB: {db_uri}")
-        # noinspection PyUnresolvedReferences
-        redun_config = redun.config.Config(
-            {
-                "scheduler": {"log_level": "DEBUG"},
-                "backend": {"db_uri": db_uri},
-            }
+        results: BuildProjectResult = run_redun_task(
+            build_project(config_text), build_dir.resolve() / ".redun-cache.db"
         )
-        scheduler = Scheduler(config=redun_config)
-        # Load/migrate the backend so the persistent DB is properly set up.
-        # Without this, providing a custom db_uri skips the automatic
-        # engine creation and migration that the in-memory default does.
-        scheduler.load()
-        results: BuildProjectResult = scheduler.run(
-            build_project(config_text),
-        )
+
         if results.static:
             logger.info(f"Static website directory is at {results.static.path}")
         if results.static_singlefile:
