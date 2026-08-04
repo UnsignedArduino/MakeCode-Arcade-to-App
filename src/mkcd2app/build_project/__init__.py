@@ -9,7 +9,7 @@ from redun.file import ContentDir, ContentFile
 
 from mkcd2app.build_project.inputs.code import (
     build_binary_js,
-    download_and_mod_supporting_files,
+    copy_support_files,
     fetch_code,
 )
 from mkcd2app.build_project.website import (
@@ -21,10 +21,7 @@ from mkcd2app.build_project.website import (
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import StaticOutput, StaticSinglefileOutput
 from mkcd2app.utils.logger import create_logger
-from mkcd2app.utils.resources import (
-    get_resource_js_tools_path,
-    get_resource_template_path,
-)
+from mkcd2app.utils.resources import get_resource_template_path
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
@@ -82,22 +79,15 @@ def build_project(config_yaml: str) -> BuildProjectResult:
     build_dir.mkdir(parents=True, exist_ok=True)
 
     with ExitStack() as stack:
-        js_tools_path = stack.enter_context(get_resource_js_tools_path())
-        js_tools_content = ContentDir(str(js_tools_path))
-
         template_path = stack.enter_context(get_resource_template_path("vite-project"))
-        template_content = ContentDir(str(template_path))
+        template_content = ContentDir(str(template_path / "vite-project"))
 
-        # Install `mkc` with `npm ci` in build dir
-        node_modules_for_mkc = install_mkcd_build_tools(config_yaml, js_tools_content)
         # Fetch game source code with `mkc`, `git`, or copy from disk
-        code_path = fetch_code(config_yaml, node_modules_for_mkc)
+        code_path = fetch_code(config_yaml)
         # Build binary.js with `mkc`
         bin_js_path = build_binary_js(config_yaml, code_path)
-        # Download supporting files to run binary.js, including ---simulator.html and all
-        # it's references, and get favicon.ico if present
-        support_path = download_and_mod_supporting_files(config_yaml)
-
+        # Copy ---simulator.html from target dir and get favicon.ico if present
+        support_path = copy_support_files(config_yaml)
         # Copy website template (clean copy with template files only)
         website_path = copy_website_template(config_yaml, template_content)
         # Copy + fill (separate dir so stages don't mutate each other's
@@ -107,7 +97,8 @@ def build_project(config_yaml: str) -> BuildProjectResult:
         )
 
         results = BuildProjectResult()
-
+        # Build the website outputs
+        # Electron and Tauri outputs depend on static_singlefile so redun figures it out
         logger.debug(f"{config.outputs=}")
         for output in config.outputs:
             match output.root:

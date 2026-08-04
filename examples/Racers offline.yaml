@@ -21,39 +21,25 @@ project:
 inputs:
   # Can be share_link, github, or path
   code:
-    type: share_link
-    value: https://arcade.makecode.com/84426-33815-03715-00484
-
-#  code:
-#    type: github
-#    value: https://github.com/UnsignedArduino/Racers
-#    checkout: master
-
-#  code:
-#    type: path
-#    value: "E:/Racers"
+    type: path
+    value: "E:/Racers"
 
   assets:
     # Icon is optional but highly recommended, it will be used as the favicon
     # and app icon
     icon:
-      # Can be url or path
-      type: url
-      value: https://raw.githubusercontent.com/UnsignedArduino/MakeCode-Arcade-to-App/refs/heads/main/examples/Racers%20icon.png
-
-#    icon:
-#      type: path
-#      value: "./examples/Racers icon.png"
+      type: path
+      value: "E:/Racers/Racers icon.png"
 
 # Path where the build process will take place
-build_dir: "./examples/Racers-build"
+build_dir: "./examples/Racers-offline-build"
 
 # The MakeCode Arcade version to target
 # Must be explicit 3 number sem ver, do not add a "v" at the beginning
 # To find it, go to https://arcade.makecode.com/ and click on the settings
 # cogwheel button, click About..., and see "arcade version: x.y.z"
 # As of the time of writing this, the latest version is 4.0.14
-target: 4.0.14
+target: 2.0.48
 
 # You can have multiple outputs
 # Currently available options are static, static-singlefile, electron, and
