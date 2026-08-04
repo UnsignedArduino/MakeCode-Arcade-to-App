@@ -19,5 +19,4 @@ def uninstall_toolchain() -> None:
 
     toolchain_path = get_toolchain_dir()
     logger.debug(f"Removing toolchain directory {toolchain_path}")
-    # Yes we want exception to crash, figure out nice message to print later
     rmtree_robust(toolchain_path)

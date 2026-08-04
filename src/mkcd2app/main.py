@@ -6,8 +6,9 @@ from mkcd2app.build_project import BuildProjectResult, build_project
 from mkcd2app.cli import generate_and_parse_args
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.target.install import install_target
-from mkcd2app.toolchains.install import install_toolchain
-from mkcd2app.toolchains.uninstall import uninstall_toolchain
+from mkcd2app.target.uninstall import uninstall_target
+from mkcd2app.toolchain.install import install_toolchain
+from mkcd2app.toolchain.uninstall import uninstall_toolchain
 from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
 from mkcd2app.utils.paths import (
     get_redun_db_for_target_path,
@@ -64,6 +65,12 @@ def main() -> None:
             logger.debug(
                 f"Uninstalling MakeCode CLI target version {uninstall_version}"
             )
+            # noinspection none-function-assignment
+            run_redun_task(
+                expr=uninstall_target(uninstall_version),
+                redun_db_path=get_redun_db_for_target_path(),
+            )
+            logger.debug(f"Target {uninstall_version} uninstalled")
 
     elif args.command == "build":
         config_path = Path(args.config)

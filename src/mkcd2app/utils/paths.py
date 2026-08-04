@@ -53,5 +53,9 @@ def get_redun_db_for_target_path() -> Path:
     return get_user_state_dir() / "redun_db_for_target.sqlite3"
 
 
+def get_target_version_dir(v: str) -> Path:
+    return get_target_dir() / v
+
+
 def get_sim_html_path(v: str) -> Path:
-    return get_target_dir() / v / "---simulator.html"
+    return get_target_version_dir(v) / "---simulator.html"

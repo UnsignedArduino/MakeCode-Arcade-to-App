@@ -90,6 +90,7 @@ def warm_npm_cache_for_templates(templates: ContentDir) -> ContentDir:
 def install_toolchain() -> tuple[ContentDir, ContentDir]:
     """
     Install the toolchain for this mkcd2app version.
+
     :return: A tuple of two ContentDirs, where the first one is the node_modules folder
      for the JS tools, and the other one is the cache directory for the templates.
     """
