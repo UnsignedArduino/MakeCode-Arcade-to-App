@@ -1,3 +1,4 @@
+import json
 import logging
 import shutil
 from io import BytesIO
@@ -72,6 +73,12 @@ def fetch_code(config_yaml: str) -> ContentDir:
         case PathCodeSource(value=path):
             logger.debug(f"Copying source code from {path}")
             shutil.copytree(path, code_path)
+
+    mkc_json_path = code_path / "mkc.json"
+    logger.debug("Writing mkc.json")
+    version = config.target
+    mkc_json = {"targetWebsite": f"https://arcade.makecode.com/v{version}"}
+    mkc_json_path.write_text(json.dumps(mkc_json))
 
     logger.debug("Source code downloaded")
     return ContentDir(str(code_path))

@@ -9,6 +9,7 @@ from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.utils.logger import create_logger
+from mkcd2app.utils.paths import get_templates_npm_cache_dir
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
@@ -143,7 +144,10 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
 
-    run_cmd(["npm", "ci"], cwd=dst)
+    cache_path = get_templates_npm_cache_dir()
+    logger.debug(f"Using template npm cache at {cache_path} to install")
+
+    run_cmd(["npm", "ci", "--cache", str(cache_path), "--offline"], cwd=dst)
     logger.debug("Website dependencies installed")
 
     run_cmd(["npm", "run", "build"], cwd=dst)
@@ -180,7 +184,10 @@ def install_deps_and_build_website_singlefile(
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
 
-    run_cmd(["npm", "ci"], cwd=dst)
+    cache_path = get_templates_npm_cache_dir()
+    logger.debug(f"Using template npm cache at {cache_path} to install")
+
+    run_cmd(["npm", "ci", "--cache", str(cache_path), "--offline"], cwd=dst)
     logger.debug("Website dependencies installed")
 
     run_cmd(["npm", "run", "build:singlefile"], cwd=dst)
