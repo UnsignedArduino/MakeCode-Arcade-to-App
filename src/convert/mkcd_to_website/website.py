@@ -112,7 +112,7 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
             if res.ok:
                 file_name = css_url.split("/")[-1]
                 # Download CSS file
-                (new_dir / "public" / file_name).write_text(res.text)
+                (new_dir / "public" / file_name).write_bytes(res.content)
                 # Rewrite CSS file to use relative paths
                 css["href"] = f"./{file_name}"
             else:
@@ -126,7 +126,7 @@ def generate_website(config: Config, prj_name: str, template_dir: Path, cwd: Pat
             if res.ok:
                 file_name = js_url.split("/")[-1]
                 # Download JS file
-                (new_dir / "public" / file_name).write_text(res.text)
+                (new_dir / "public" / file_name).write_bytes(res.content)
                 # Rewrite JS file to use relative paths
                 js["src"] = f"./{file_name}"
             else:
