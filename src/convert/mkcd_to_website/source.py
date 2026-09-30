@@ -44,7 +44,7 @@ def download_source(config: Config, cwd: Path,
     if config.source_type == SourceType.GITHUB:
         logger.info(f"Downloading source from GitHub")
         # Assume it's `git clone`able
-        run_command(["git", "clone", config.source, source_code_path], cwd=cwd)
+        run_command(["git", "clone", config.source, source_code_path.name], cwd=cwd)
         logger.info(f"Checking out {config.source_checkout}")
         run_command(["git", "checkout", config.source_checkout], cwd=source_code_path)
     elif config.source_type == SourceType.SHARE_LINK:
