@@ -12,10 +12,12 @@ from mkcd2app.build_project.inputs.code import (
     fetch_code,
 )
 from mkcd2app.build_project.website import (
+    _website_dir,
+    build_website,
+    build_website_singlefile,
     copy_website_template,
     fill_website_template,
-    install_deps_and_build_website,
-    install_deps_and_build_website_singlefile,
+    install_website_deps,
 )
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import StaticOutput, StaticSinglefileOutput
@@ -65,6 +67,13 @@ def build_project(config_yaml: str) -> BuildProjectResult:
         website_filled_path = fill_website_template(
             config_yaml, website_path, bin_js_path, support_path
         )
+        # `npm ci` from only package.json + lockfile, so game/asset changes don't
+        #  bust it; shared by every website output
+        node_modules = install_website_deps(
+            str(_website_dir(build_dir, config.project.path_friendly_name, "-deps")),
+            ContentFile(str(template_path / "package.json")),
+            ContentFile(str(template_path / "package-lock.json")),
+        )
 
         results = BuildProjectResult()
         # Build the website outputs
@@ -73,12 +82,13 @@ def build_project(config_yaml: str) -> BuildProjectResult:
         for output in config.outputs:
             match output.root:
                 case StaticOutput():
-                    # Copy + `npm ci` + `npm run build` (separate dir for same reason)
-                    results.static = install_deps_and_build_website(website_filled_path)
+                    # Copy + node_modules + `npm run build` (separate dir for same
+                    #  reason)
+                    results.static = build_website(website_filled_path, node_modules)
                     logger.debug("Will build to static website")
                 case StaticSinglefileOutput():
-                    results.static_singlefile = (
-                        install_deps_and_build_website_singlefile(website_filled_path)
+                    results.static_singlefile = build_website_singlefile(
+                        website_filled_path, node_modules
                     )
                     logger.debug("Will build to static single-file website")
 

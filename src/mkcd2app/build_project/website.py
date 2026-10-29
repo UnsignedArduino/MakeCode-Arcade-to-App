@@ -122,33 +122,75 @@ def fill_website_template(
 
 
 @task(namespace="mkcd2app")
-def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDir:
+def install_website_deps(
+    deps_dir: str, package_json: ContentFile, package_lock: ContentFile
+) -> ContentDir:
     """
-    Make a copy of the template website, then ``npm ci`` and `npm run build` in it.
+    ``npm ci`` the template's dependencies in their own directory.
 
-    We copy so that we never mutate a ContentDir that another task owns,
-    keeping ContentDir hashes stable for caching.
+    Only package.json and package-lock.json are inputs, so changing the game or its
+    assets doesn't bust the cached install. The template's unfilled package.json is
+    used because filling only changes metadata that ``npm ci`` ignores.
 
-    Example input: racers-website-filled
-    Example output: racers-website-filled-built
+    Example input: racers-website-deps, package.json, package-lock.json
+    Example output: racers-website-deps/node_modules
 
-    :param website_filled_path: A redun.ContentDir pointing to the template website.
-    :return: A redun.ContentDir pointing to the directory of static HTML/CSS/JS files
-     ready to serve.
+    :param deps_dir: The directory to install into.
+    :param package_json: A redun.ContentFile pointing to the template's package.json.
+    :param package_lock: A redun.ContentFile pointing to the template's lockfile.
+    :return: A redun.ContentDir pointing to the installed node_modules.
     """
-    src = Path(website_filled_path.path)
-    dst = src.parent / f"{src.name}-built"
-    logger.info("Installing website dependencies and building to static HTML/CSS/JS")
+    dst = Path(deps_dir)
+    logger.info("Installing website dependencies")
 
     if dst.exists():
         shutil.rmtree(dst)
-    shutil.copytree(src, dst)
+    dst.mkdir(parents=True)
+    shutil.copy(package_json.path, dst / "package.json")
+    shutil.copy(package_lock.path, dst / "package-lock.json")
 
     cache_path = get_templates_npm_cache_dir()
     logger.debug(f"Using template npm cache at {cache_path} to install")
 
     run_cmd(["npm", "ci", "--cache", str(cache_path), "--offline"], cwd=dst)
     logger.debug("Website dependencies installed")
+
+    return ContentDir(str(dst / "node_modules"))
+
+
+def _copy_site_with_deps(src: Path, dst: Path, node_modules: ContentDir) -> None:
+    """Copy the filled site to ``dst`` and put a copy of ``node_modules`` in it."""
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+    # Keep symlinks as symlinks: on POSIX node_modules/.bin entries are relative
+    #  symlinks, and copying their targets breaks the scripts' relative imports
+    shutil.copytree(node_modules.path, dst / "node_modules", symlinks=True)
+
+
+@task(namespace="mkcd2app")
+def build_website(
+    website_filled_path: ContentDir, node_modules: ContentDir
+) -> ContentDir:
+    """
+    Make a copy of the filled website with node_modules, then `npm run build` in it.
+
+    We copy so that we never mutate a ContentDir that another task owns,
+    keeping ContentDir hashes stable for caching.
+
+    Example input: racers-website-filled, racers-website-deps/node_modules
+    Example output: racers-website-filled-built/dist
+
+    :param website_filled_path: A redun.ContentDir pointing to the filled website.
+    :param node_modules: A redun.ContentDir pointing to the installed dependencies.
+    :return: A redun.ContentDir pointing to the directory of static HTML/CSS/JS files
+     ready to serve.
+    """
+    src = Path(website_filled_path.path)
+    dst = src.parent / f"{src.name}-built"
+    logger.info("Building website to static HTML/CSS/JS")
+
+    _copy_site_with_deps(src, dst, node_modules)
 
     run_cmd(["npm", "run", "build"], cwd=dst)
     logger.debug("Website built successfully")
@@ -161,34 +203,28 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
 
 
 @task(namespace="mkcd2app")
-def install_deps_and_build_website_singlefile(
-    website_filled_path: ContentDir,
+def build_website_singlefile(
+    website_filled_path: ContentDir, node_modules: ContentDir
 ) -> ContentFile:
     """
-    Make a copy of the template website, then ``npm ci`` and `npm run build:singlefile` in it.
+    Make a copy of the filled website with node_modules, then
+    `npm run build:singlefile` in it.
 
     We copy so that we never mutate a ContentDir that another task owns,
     keeping ContentDir hashes stable for caching.
 
-    Example input: racers-website-filled
+    Example input: racers-website-filled, racers-website-deps/node_modules
     Example output: index.html
 
-    :param website_filled_path: A redun.ContentDir pointing to the template website.
+    :param website_filled_path: A redun.ContentDir pointing to the filled website.
+    :param node_modules: A redun.ContentDir pointing to the installed dependencies.
     :return: A redun.ContentFile pointing to the single-file HTML.
     """
     src = Path(website_filled_path.path)
     dst = src.parent / f"{src.name}-singlefile-built"
-    logger.info("Installing website dependencies and building to static HTML file")
+    logger.info("Building website to static HTML file")
 
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
-
-    cache_path = get_templates_npm_cache_dir()
-    logger.debug(f"Using template npm cache at {cache_path} to install")
-
-    run_cmd(["npm", "ci", "--cache", str(cache_path), "--offline"], cwd=dst)
-    logger.debug("Website dependencies installed")
+    _copy_site_with_deps(src, dst, node_modules)
 
     run_cmd(["npm", "run", "build:singlefile"], cwd=dst)
     logger.debug("Website built successfully")

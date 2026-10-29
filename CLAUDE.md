@@ -46,8 +46,9 @@ between tasks must go through task arguments/returns, not side channels.
 
 Build pipeline (`build_project/__init__.py`), each step a task:
 `fetch_code` → `build_binary_js` (runs `mkc`) + `copy_support_files` (simulator HTML
-from the target dir, icon) + `copy_website_template` → `fill_website_template` → one
-`install_deps_and_build_website*` task per entry in `outputs`. A new output type means
+from the target dir, icon) + `copy_website_template` → `fill_website_template`, plus
+`install_website_deps` (`npm ci` from only the template's `package.json` and lockfile)
+→ one `build_website*` task per entry in `outputs`. A new output type means
 a new `case` arm in that `match` plus a field on `BuildProjectResult`.
 
 Conventions that matter for redun hashing:

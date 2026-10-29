@@ -1,7 +1,7 @@
 # MakeCode-Arcade-to-App Rewrite — Project Context
 
-_Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change and the
-small known-issue fixes, and `origin/main` @ `d31e2a5`, as of 2026-10-29._
+_Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
+small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29._
 
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -50,6 +50,10 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
 - **Copy-on-write stages:** a path is never written after it's been returned as a
   `ContentDir`/`ContentFile` (`x-website` → `-filled` → `-filled-built`).
 - **Website builds are offline:** `npm ci --cache <toolchain cache> --offline`.
+  `install_website_deps` runs it once in `x-website-deps`, hashing only the template's
+  `package.json`/lockfile, so game and asset changes don't bust it. Each
+  `build_website*` task copies that `node_modules` into its own copy of the filled site
+  and runs only `npm run build*`.
 - **redun patches** (`_redun_compat.py`): `get_proto` (Windows drive letters),
   `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes). No
   tests cover them yet.
@@ -110,8 +114,8 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   simulator HTML. Editing a path-sourced game returns the old cached build until
   `--full-rebuild`. Decided to rely on that flag for all sources rather than track
   each one.
-- `install_deps_and_build_website*` hash the whole filled site, not just
-  `package.json`/lockfile, so changing an asset busts the dep cache.
+- Fixed: the website dep install used to hash the whole filled site, so any asset
+  change re-ran `npm ci`; it's now its own task (see Architecture).
 - Fixed: `download_sim` now decodes downloads as UTF-8 instead of `res.text`, and all
   text file reads/writes in `src/` pass `encoding="utf-8"`. (The 4.0.14 simulator was
   pure ASCII, so this hadn't caused damage yet.) Also fixed: the `uninstall_toolchain`
