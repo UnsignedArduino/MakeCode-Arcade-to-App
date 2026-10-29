@@ -1,6 +1,7 @@
 # MakeCode-Arcade-to-App Rewrite — Project Context
 
-_Verified against `origin/toolchain` @ `66378b1` and `origin/main` @ `d31e2a5`, as of 2026-10-28._
+_Verified against `toolchain` @ the "Fix e2e test and enable redun caching" commit (child of
+`293191e`) and `origin/main` @ `d31e2a5`, as of 2026-10-29._
 
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -12,7 +13,7 @@ and copes with churn in the JS ecosystem.
 ```
 main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = dag)
 ```
-- The work is on `toolchain`: 49 commits ahead of `main`, 9 ahead of `dag`.
+- The work is on `toolchain`: 52 commits ahead of `main`, 12 ahead of `dag` (`b9c2ab2`).
 - `main` has 2 legacy-only fixes (`d17b052`, `d31e2a5`) to files the rewrite deleted.
   Merging gives 2 modify/delete conflicts; resolve them by keeping the deletions.
 - The legacy Electron/Tauri code to use as reference is on **`main`**
@@ -40,8 +41,8 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
 - **redun `0.44.1`** (pinned) is the DAG engine, embedded via
   `utils/run_redun_task.py`. Each command keeps its own SQLite DB (toolchain, target,
   or `build_dir/.redun-cache.db`).
-- **⚠️ Caching is disabled:** `scheduler.run(expr, cache=False)` (marked TODO). Nothing
-  persists between runs, so builds aren't incremental yet.
+- **Caching is enabled:** an unchanged rebuild is served entirely from the redun cache.
+  Not every input is tracked yet, though (see "Stale cache" under Known issues).
 - **Config is passed to tasks as raw YAML text**, because pickling pydantic objects
   isn't deterministic and that breaks redun's hashing.
 - **Copy-on-write stages:** a path is never written after it's been returned as a
@@ -75,19 +76,20 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   extensions**, which are fetched per game; `mkc`'s extension cache isn't redirected.
 - **Not implemented:** Electron and Tauri. The models and result fields exist, but
   `build_project` has no `case` arms for them.
-- **E2E test is broken and has never run on `toolchain`:**
-  1. The fixture YAML has no `target:` (required field).
-  2. Nothing runs `toolchain install` / `target install` first.
-  3. The "second build < 5s" check can't pass while `cache=False` is set, and it's only
-     a wall-clock proxy anyway.
-  4. CI only triggers on `main`, so the stacked PRs never get CI. The last green run was
-     on `dag` @ `b9c2ab2` (2026-07-31).
+- **E2E test passes locally** (Windows, `uv run pytest`, ~2 min). A session fixture runs
+  `toolchain install` and `target install 4.0.14` into the real user dirs (no env
+  override yet). The cache test parses the `ALL` row of the job status table redun logs
+  to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged rebuild; this
+  depends on redun's log format, which is safe while redun is pinned.
+- **CI still only triggers on `main`**, so the stacked PRs never get CI. The last green
+  run was on `dag` @ `b9c2ab2` (2026-07-31); the fixed test hasn't run in CI yet.
 - Only `tests/e2e` exists; there are no unit or integration tests yet.
 
 ## Roadmap
-1. **Fix e2e + CI:** add `target:` to the fixture; install toolchain/target in a session
-   fixture (with an env override for the user dirs); make CI run for stacked PRs.
-2. **Remove `cache=False`**, then assert "task didn't re-execute" instead of wall-clock time.
+1. **Finish CI:** make CI run for stacked PRs; add an env override for the user dirs so
+   tests don't install into the real ones. (Fixture `target:`, install fixture, removing
+   `cache=False` and the job-status cache assertion are done.)
+2. **Fix the stale-cache inputs** (Known issues) so edits to tracked sources rebuild.
 3. Merge `main` into `toolchain`; consider porting the `download_sim` bytes fix.
 4. Unit/integration tests, including the redun patches.
 5. Electron, then Tauri (reference: `main`).
@@ -96,9 +98,13 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
 8. Later: code signing, auto-update, README (currently a stub), schema docs.
 
 ## Known issues
+- **Stale cache for out-of-band inputs:** `fetch_code` and `copy_support_files` only
+  take the config YAML, so redun can't see changes to a `path` code source, a
+  `github` branch checkout, an icon path/URL, or the installed simulator HTML.
+  Editing a path-sourced game returns the old cached build until `--clear-cache`.
 - `install_deps_and_build_website*` hash the whole filled site, not just
   `package.json`/lockfile, so changing an asset busts the dep cache.
-- `download_sim` (`target/install.py:88-120`) inlines `res.text` and calls
+- `download_sim` (`target/install.py:70-124`) inlines `res.text` and calls
   `write_text()` without an encoding. Likely the same bug `main` fixed in `d17b052`
   (unconfirmed).
 - `uninstall_toolchain` docstring says it removes the redun DB; it doesn't (the DB is

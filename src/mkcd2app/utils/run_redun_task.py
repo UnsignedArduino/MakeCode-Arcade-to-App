@@ -23,5 +23,4 @@ def run_redun_task(expr: Expression[Result] | Result, redun_db_path: Path) -> Re
     )
     scheduler = Scheduler(config=redun_config)
     scheduler.load()
-    # TODO: don't forget to remove cache=False after done testing
-    return scheduler.run(expr, cache=False)
+    return scheduler.run(expr)
