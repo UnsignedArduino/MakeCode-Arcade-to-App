@@ -78,7 +78,7 @@ def fetch_code(config_yaml: str) -> ContentDir:
     logger.debug("Writing mkc.json")
     version = config.target
     mkc_json = {"targetWebsite": f"https://arcade.makecode.com/v{version}"}
-    mkc_json_path.write_text(json.dumps(mkc_json))
+    mkc_json_path.write_text(json.dumps(mkc_json), encoding="utf-8")
 
     logger.debug("Source code downloaded")
     return ContentDir(str(code_path))

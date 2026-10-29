@@ -50,7 +50,7 @@ def warm_mkc_cache_for_version_and_get_binary_js_metadata(
         mkc_json_path = tmp_dir_path / "mkc.json"
         logger.debug("Writing mkc.json")
         mkc_json = {"targetWebsite": f"https://arcade.makecode.com/v{version}"}
-        mkc_json_path.write_text(json.dumps(mkc_json))
+        mkc_json_path.write_text(json.dumps(mkc_json), encoding="utf-8")
 
         logger.debug("Running build to warm cache")
         run_cmd(
@@ -64,6 +64,21 @@ def warm_mkc_cache_for_version_and_get_binary_js_metadata(
         metadata = extract_meta_comment(binary_js_path)
         logger.debug(f"{metadata=}")
         return metadata.model_dump_json()
+
+
+def _download_text(url: str) -> str:
+    """
+    Download a text file and decode it as UTF-8.
+
+    ``res.text`` falls back to ISO-8859-1 when the server sends no charset, which
+    mangles UTF-8 content, so decode the raw bytes ourselves.
+
+    :param url: The URL to download.
+    :return: The decoded text.
+    """
+    res = requests.get(url)
+    res.raise_for_status()
+    return res.content.decode("utf-8")
 
 
 @task(namespace="mkcd2app")
@@ -83,9 +98,7 @@ def download_sim(bin_js_metadata: str, version: str) -> ContentFile:
     )
 
     logger.debug(f"Downloading main simulator file from {metadata.simUrl}")
-    res = requests.get(str(metadata.simUrl))
-    res.raise_for_status()
-    sim_html = res.text
+    sim_html = _download_text(str(metadata.simUrl))
 
     logger.debug(
         f"Analyzing sim HTML ({len(sim_html)} chars) for required CSS and JS files"
@@ -98,26 +111,22 @@ def download_sim(bin_js_metadata: str, version: str) -> ContentFile:
         url = css.get("href")
         if url:
             logger.debug(f"Downloading CSS file {url}")
-            res = requests.get(str(url))
-            res.raise_for_status()
             style_tag = soup.new_tag("style")
-            style_tag.string = res.text
+            style_tag.string = _download_text(str(url))
             css.replace_with(style_tag)
             logger.debug(f"Inlined CSS from {url}")
     for js in js_scripts:
         url = js.get("src")
         if url:
             logger.debug(f"Downloading JS file {url}")
-            res = requests.get(str(url))
-            res.raise_for_status()
-            js.string = res.text
+            js.string = _download_text(str(url))
             del js["src"]
             logger.debug(f"Inlined JS from {url}")
     new_sim_html = soup.prettify(formatter="html5")
 
     path = get_sim_html_path(version)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(new_sim_html)
+    path.write_text(new_sim_html, encoding="utf-8")
 
     logger.debug(f"Wrote simulator HTML to {path}")
 

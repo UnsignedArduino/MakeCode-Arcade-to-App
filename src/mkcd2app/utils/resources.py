@@ -8,7 +8,7 @@ from pathlib import Path
 def get_resource_template_path(name: str | None = None) -> Iterator[Path]:
     ref = files("mkcd2app").joinpath("resources", "templates")
     if name:
-        ref.joinpath(name)
+        ref = ref.joinpath(name)
     with as_file(ref) as path:
         yield path
 

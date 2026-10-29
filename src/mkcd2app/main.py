@@ -76,7 +76,7 @@ def main() -> None:
         config_path = Path(args.config)
         logger.debug(f"Building project with config {config_path}")
 
-        config_text = config_path.read_text()
+        config_text = config_path.read_text(encoding="utf-8")
 
         # Parse once only to extract build_dir for the redun DB path.
         # The raw YAML text is passed to redun tasks so that argument

@@ -1,7 +1,7 @@
 # MakeCode-Arcade-to-App Rewrite — Project Context
 
-_Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, and
-`origin/main` @ `d31e2a5`, as of 2026-10-29._
+_Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change and the
+small known-issue fixes, and `origin/main` @ `d31e2a5`, as of 2026-10-29._
 
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -97,12 +97,11 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
    job-status cache assertion, CI on all PRs).
 2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
    it for out-of-band input changes). Still belongs in the README once that exists.
-3. Merge `main` into `toolchain`; consider porting the `download_sim` bytes fix.
-4. Unit/integration tests, including the redun patches.
-5. Electron, then Tauri (reference: `main`).
-6. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
-7. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning UX.
-8. Later: code signing, auto-update, README (currently a stub), schema docs.
+3. Unit/integration tests, including the redun patches.
+4. Electron, then Tauri (reference: `main`).
+5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
+6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning UX.
+7. Later: code signing, auto-update, README (currently a stub), schema docs.
 
 ## Known issues
 - **Out-of-band inputs (by design):** `fetch_code` and
@@ -113,14 +112,9 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   each one.
 - `install_deps_and_build_website*` hash the whole filled site, not just
   `package.json`/lockfile, so changing an asset busts the dep cache.
-- `download_sim` (`target/install.py:70-124`) inlines `res.text` and calls
-  `write_text()` without an encoding. Likely the same bug `main` fixed in `d17b052`
-  (unconfirmed).
-- `uninstall_toolchain` docstring says it removes the redun DB; it doesn't (the DB is
-  in the state dir).
-- `get_resource_template_path(name)` throws away its `joinpath(name)` result, so the
-  argument does nothing; callers append `"vite-project"` themselves.
-- `load_config_from_yaml` uses `data.version` on a dict, so it raises `AttributeError`
-  instead of `NotImplementedError`.
-- Cosmetic: stale "deps-installed website" docstring in `fill_website_template`;
-  `examples/Racers offline.yaml` has a stray "latest is 4.0.14" comment.
+- Fixed: `download_sim` now decodes downloads as UTF-8 instead of `res.text`, and all
+  text file reads/writes in `src/` pass `encoding="utf-8"`. (The 4.0.14 simulator was
+  pure ASCII, so this hadn't caused damage yet.) Also fixed: the `uninstall_toolchain`
+  docstring, `get_resource_template_path(name)` ignoring `name`,
+  `load_config_from_yaml` raising `AttributeError` on an unknown version, the stale
+  `fill_website_template` docstring, and the stray comment in `Racers offline.yaml`.

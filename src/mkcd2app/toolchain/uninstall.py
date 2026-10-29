@@ -13,7 +13,7 @@ logger = create_logger(name=__name__, level=logging.INFO)
 def uninstall_toolchain() -> None:
     """
     Uninstall the toolchain for this mkcd2app version by removing the toolchain
-    directory and its redun cache DB.
+    directory. The toolchain redun DB lives in the state dir and is left in place.
     """
     logger.info("Uninstalling toolchain")
 

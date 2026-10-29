@@ -12,7 +12,7 @@ def extract_meta_comment(file_path: Path) -> BinaryJSMetadata:
     :return: The metadata (a BinaryJSMetadata)
     :raises ValueError: If the meta comment is not found in file.
     """
-    with file_path.open("rt") as f:
+    with file_path.open("rt", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line.startswith("// meta="):

@@ -50,7 +50,7 @@ def build_project(config_yaml: str) -> BuildProjectResult:
 
     with ExitStack() as stack:
         template_path = stack.enter_context(get_resource_template_path("vite-project"))
-        template_content = ContentDir(str(template_path / "vite-project"))
+        template_content = ContentDir(str(template_path))
 
         # Fetch game source code with `mkc`, `git`, or copy from disk
         code_path = fetch_code(config_yaml)
