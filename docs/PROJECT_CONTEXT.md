@@ -81,14 +81,15 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   override yet). The cache test parses the `ALL` row of the job status table redun logs
   to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged rebuild; this
   depends on redun's log format, which is safe while redun is pinned.
-- **CI still only triggers on `main`**, so the stacked PRs never get CI. The last green
-  run was on `dag` @ `b9c2ab2` (2026-07-31); the fixed test hasn't run in CI yet.
+- **CI** (`lint.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs into any branch,
+  so the stacked PRs get CI once pushed. The last green run was on `dag` @ `b9c2ab2`
+  (2026-07-31); the fixed e2e test hasn't run in CI yet.
 - Only `tests/e2e` exists; there are no unit or integration tests yet.
 
 ## Roadmap
-1. **Finish CI:** make CI run for stacked PRs; add an env override for the user dirs so
-   tests don't install into the real ones. (Fixture `target:`, install fixture, removing
-   `cache=False` and the job-status cache assertion are done.)
+1. **Finish e2e:** add an env override for the user dirs so tests don't install into
+   the real ones. (Fixture `target:`, install fixture, removing `cache=False`, the
+   job-status cache assertion and CI on all PRs are done.)
 2. **Fix the stale-cache inputs** (Known issues) so edits to tracked sources rebuild.
 3. Merge `main` into `toolchain`; consider porting the `download_sim` bytes fix.
 4. Unit/integration tests, including the redun patches.
