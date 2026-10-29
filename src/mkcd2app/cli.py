@@ -29,9 +29,11 @@ def generate_and_parse_args() -> Namespace:
     )
     parser_build.add_argument("config", type=str, help="Path to the YAML config file.")
     parser_build.add_argument(
-        "--clear-cache",
+        "--full-rebuild",
         action="store_true",
-        help="Delete the entire build directory before building.",
+        help="Delete the build directory and its cache, then rebuild everything. Use "
+        "this after changing the game's source files, icon, or GitHub branch, since "
+        "only changes to the config file are detected automatically.",
     )
 
     parser_toolchain = subparsers.add_parser(

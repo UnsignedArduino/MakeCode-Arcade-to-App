@@ -85,7 +85,7 @@ def main() -> None:
         config = load_config_from_yaml(config_text)
         build_dir = Path(config.build_dir)
 
-        if args.clear_cache:
+        if args.full_rebuild:
             if build_dir.exists():
                 logger.warning(f"Clearing build directory {build_dir}")
                 shutil.rmtree(build_dir)

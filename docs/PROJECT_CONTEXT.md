@@ -1,7 +1,7 @@
 # MakeCode-Arcade-to-App Rewrite — Project Context
 
-_Verified against `toolchain` @ the "Fix e2e test and enable redun caching" commit (child of
-`293191e`) and `origin/main` @ `d31e2a5`, as of 2026-10-29._
+_Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, and
+`origin/main` @ `d31e2a5`, as of 2026-10-29._
 
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -13,7 +13,8 @@ and copes with churn in the JS ecosystem.
 ```
 main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = dag)
 ```
-- The work is on `toolchain`: 52 commits ahead of `main`, 12 ahead of `dag` (`b9c2ab2`).
+- The work is on `toolchain`: 53 commits ahead of `main`, 13 ahead of `dag` (`b9c2ab2`)
+  as of `d7ad64a`.
 - `main` has 2 legacy-only fixes (`d17b052`, `d31e2a5`) to files the rewrite deleted.
   Merging gives 2 modify/delete conflicts; resolve them by keeping the deletions.
 - The legacy Electron/Tauri code to use as reference is on **`main`**
@@ -42,7 +43,8 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
   `utils/run_redun_task.py`. Each command keeps its own SQLite DB (toolchain, target,
   or `build_dir/.redun-cache.db`).
 - **Caching is enabled:** an unchanged rebuild is served entirely from the redun cache.
-  Not every input is tracked yet, though (see "Stale cache" under Known issues).
+  Inputs outside the config aren't tracked, so picking up their changes needs
+  `--full-rebuild` (see "Out-of-band inputs" under Known issues).
 - **Config is passed to tasks as raw YAML text**, because pickling pydantic objects
   isn't deterministic and that breaks redun's hashing.
 - **Copy-on-write stages:** a path is never written after it's been returned as a
@@ -57,14 +59,16 @@ Global `--debug` (goes before the subcommand). Commands must run in this order:
 ```
 mkcd2app toolchain install           # mkc CLI + warm template npm cache
 mkcd2app target install <x.y.z>      # warm mkc compiler cache + download/inline simulator HTML
-mkcd2app build <config.yaml> [--clear-cache]
+mkcd2app build <config.yaml> [--full-rebuild]
 ```
 Also `toolchain uninstall` and `target uninstall <ver>`. `toolchain status` and
 `target list` are **stubs**. `build` has **no pre-flight checks**: a missing target
 fails with a raw `FileNotFoundError`, a missing toolchain with "Executable 'mkc' not found".
 
 State lives under `platformdirs` user dirs, namespaced by mkcd2app version (static
-`0.1.0`). A version bump means re-running both installs.
+`0.1.0`). A version bump means re-running both installs. Setting `MKCD2APP_HOME`
+moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`). `mkc`'s own
+compiler/extension caches aren't covered by this.
 
 Config: `version`, `project`, `inputs.code` (share_link | github | path),
 `inputs.assets.icon` (optional), `build_dir`, `target` (required, strict `x.y.z`),
@@ -76,21 +80,23 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   extensions**, which are fetched per game; `mkc`'s extension cache isn't redirected.
 - **Not implemented:** Electron and Tauri. The models and result fields exist, but
   `build_project` has no `case` arms for them.
-- **E2E test passes locally** (Windows, `uv run pytest`, ~2 min). A session fixture runs
-  `toolchain install` and `target install 4.0.14` into the real user dirs (no env
-  override yet). The cache test parses the `ALL` row of the job status table redun logs
-  to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged rebuild; this
-  depends on redun's log format, which is safe while redun is pinned.
+- **E2E test passes** locally (Windows, ~1 min with installs cached) and in CI on
+  ubuntu/windows/macos (PR #7 @ `d7ad64a`). A session fixture sets `MKCD2APP_HOME` to
+  `.pytest_cache/d/mkcd2app-home` and runs `toolchain install` and
+  `target install 4.0.14` there, so the real user dirs are untouched and reruns hit
+  the install cache. The cache test parses the `ALL` row of the job status table redun
+  logs to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged
+  rebuild; this depends on redun's log format, which is safe while redun is pinned.
+  Nothing yet tests that changing an input does trigger a rebuild.
 - **CI** (`lint.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs into any branch,
-  so the stacked PRs get CI once pushed. The last green run was on `dag` @ `b9c2ab2`
-  (2026-07-31); the fixed e2e test hasn't run in CI yet.
+  so the stacked PRs get CI. Lint and all three e2e jobs are green on PR #7.
 - Only `tests/e2e` exists; there are no unit or integration tests yet.
 
 ## Roadmap
-1. **Finish e2e:** add an env override for the user dirs so tests don't install into
-   the real ones. (Fixture `target:`, install fixture, removing `cache=False`, the
-   job-status cache assertion and CI on all PRs are done.)
-2. **Fix the stale-cache inputs** (Known issues) so edits to tracked sources rebuild.
+1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
+   job-status cache assertion, CI on all PRs).
+2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
+   it for out-of-band input changes). Still belongs in the README once that exists.
 3. Merge `main` into `toolchain`; consider porting the `download_sim` bytes fix.
 4. Unit/integration tests, including the redun patches.
 5. Electron, then Tauri (reference: `main`).
@@ -99,10 +105,12 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
 8. Later: code signing, auto-update, README (currently a stub), schema docs.
 
 ## Known issues
-- **Stale cache for out-of-band inputs:** `fetch_code` and `copy_support_files` only
-  take the config YAML, so redun can't see changes to a `path` code source, a
-  `github` branch checkout, an icon path/URL, or the installed simulator HTML.
-  Editing a path-sourced game returns the old cached build until `--clear-cache`.
+- **Out-of-band inputs (by design):** `fetch_code` and
+  `copy_support_files` only take the config YAML, so redun can't see changes to a
+  `path` code source, a `github` branch checkout, an icon path/URL, or the installed
+  simulator HTML. Editing a path-sourced game returns the old cached build until
+  `--full-rebuild`. Decided to rely on that flag for all sources rather than track
+  each one.
 - `install_deps_and_build_website*` hash the whole filled site, not just
   `package.json`/lockfile, so changing an asset busts the dep cache.
 - `download_sim` (`target/install.py:70-124`) inlines `res.text` and calls

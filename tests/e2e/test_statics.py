@@ -43,15 +43,21 @@ def parse_job_status_totals(redun_output: str) -> dict[str, int]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def installed_toolchain_and_target() -> None:
-    run_mkcd2app("toolchain", "install")
-    run_mkcd2app("target", "install", TARGET_VERSION)
+def installed_toolchain_and_target(pytestconfig: pytest.Config) -> Generator[None]:
+    # Install into a dir under .pytest_cache instead of the real user dirs; it
+    # persists between sessions so reruns hit the install's redun cache
+    home = pytestconfig.cache.mkdir("mkcd2app-home")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("MKCD2APP_HOME", str(home))
+        run_mkcd2app("toolchain", "install")
+        run_mkcd2app("target", "install", TARGET_VERSION)
+        yield
 
 
 @pytest.fixture(scope="module")
 def empty_game_build_to_statics() -> Generator[None]:
     # Clear any previous build (and its redun cache) so the first build runs fully
-    run_empty_game_build("--clear-cache")
+    run_empty_game_build("--full-rebuild")
 
     yield
 

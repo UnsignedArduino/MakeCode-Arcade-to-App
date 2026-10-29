@@ -1,3 +1,4 @@
+import os
 from importlib.metadata import version
 from pathlib import Path
 
@@ -10,13 +11,26 @@ def get_mkcd2app_version() -> str:
 
 DIRS = PlatformDirs("mkcd2app", appauthor=False)
 
+# If set, data and state go under this directory instead of the platformdirs user
+# dirs (e.g. so tests don't touch the real install)
+HOME_ENV_VAR = "MKCD2APP_HOME"
+
+
+def get_home_override_dir() -> Path | None:
+    home = os.environ.get(HOME_ENV_VAR)
+    return Path(home) if home else None
+
 
 def get_user_data_dir() -> Path:
-    return Path(DIRS.user_data_dir) / get_mkcd2app_version()
+    home = get_home_override_dir()
+    base = home / "data" if home else Path(DIRS.user_data_dir)
+    return base / get_mkcd2app_version()
 
 
 def get_user_state_dir() -> Path:
-    return Path(DIRS.user_state_dir) / get_mkcd2app_version()
+    home = get_home_override_dir()
+    base = home / "state" if home else Path(DIRS.user_state_dir)
+    return base / get_mkcd2app_version()
 
 
 # Toolchain stuff
