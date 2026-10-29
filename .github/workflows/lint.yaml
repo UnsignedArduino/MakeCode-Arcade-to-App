@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [ main ]
+  # Any base branch, so stacked PRs get CI too
   pull_request:
-    branches: [ main ]
 
 jobs:
   lint:

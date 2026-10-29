@@ -48,6 +48,13 @@ inputs:
 # Path where the build process will take place
 build_dir: "./examples/Racers-build"
 
+# The MakeCode Arcade version to target
+# Must be explicit 3 number sem ver, do not add a "v" at the beginning
+# To find it, go to https://arcade.makecode.com/ and click on the settings
+# cogwheel button, click About..., and see "arcade version: x.y.z"
+# As of the time of writing this, the latest version is 4.0.14
+target: 4.0.14
+
 # You can have multiple outputs
 # Currently available options are static, static-singlefile, electron, and
 # tauri

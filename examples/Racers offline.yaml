@@ -1,0 +1,57 @@
+# Example configuration file for MakeCode Arcade to App to compile to static
+# HTML, CSS, and JS files
+
+# Config version (single number, incremented if breaking change to schema is
+# made)
+version: 1
+
+project:
+  name: Racers
+  path_friendly_name: racers
+  description: "Enjoy the high-speed thrills of car racing in MakeCode Arcade! 
+    For the MakeCode Arcade Mini Game Jam #3."
+  author: Cyrus Yiu
+  version: 1.3.2
+  # This is what the window title will be
+  # This will also be used for the executable file name for Electron outputs
+  # You can use {NAME} or {VERSION} or {AUTHOR} to substitute the correct
+  # values
+  title: "{NAME} v{VERSION}"
+
+inputs:
+  # Can be share_link, github, or path
+  code:
+    type: path
+    value: "E:/Racers"
+
+  assets:
+    # Icon is optional but highly recommended, it will be used as the favicon
+    # and app icon
+    icon:
+      type: path
+      value: "E:/Racers/Racers icon.png"
+
+# Path where the build process will take place
+build_dir: "./examples/Racers-offline-build"
+
+# The MakeCode Arcade version to target
+# Must be explicit 3 number sem ver, do not add a "v" at the beginning
+# To find it, go to https://arcade.makecode.com/ and click on the settings
+# cogwheel button, click About..., and see "arcade version: x.y.z"
+target: 2.0.48
+
+# You can have multiple outputs
+# Currently available options are static, static-singlefile, electron, and
+# tauri
+outputs:
+  - type: static
+  - type: static-singlefile
+#  - type: electron
+#    window:
+#      width: 640
+#      height: 480
+#  - type: tauri
+#    identifier: com.unsignedarduino.racers
+#    window:
+#      width: 640
+#      height: 480

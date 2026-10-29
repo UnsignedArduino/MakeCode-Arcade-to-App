@@ -109,6 +109,7 @@ class BuildConfig(BaseModel):
     project: Project
     inputs: Inputs
     build_dir: str = Field(..., alias="build_dir")
+    target: str = Field(..., alias="target")
     outputs: list[OutputOption]
 
     class Config:

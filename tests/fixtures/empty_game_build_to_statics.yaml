@@ -38,6 +38,9 @@ inputs:
 # Path where the build process will take place
 build_dir: "./examples/testing/empty_game_build"
 
+# MakeCode Arcade target version (must be installed with `mkcd2app target install`)
+target: 4.0.14
+
 # You can have multiple outputs
 # Currently available options are static, static-singlefile, electron, and
 # tauri
