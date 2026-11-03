@@ -3,7 +3,8 @@
 _Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
 small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29.
 External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03, then
-updated for the Dulwich git replacement and the generic `git` code source the same day._
+updated for the Dulwich git replacement and the generic `git` code source the same day,
+and for the `file` code source (PNG/UF2 with embedded project) the same day._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -35,7 +36,7 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
-Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`), `tests/fixtures/`, `examples/` (Racers), CI
+Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, embedded PNG/UF2 source), `tests/fixtures/`, `examples/` (Racers), CI
 workflows `lint.yaml` (ubuntu) and `e2e.yaml` (ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
  
@@ -90,7 +91,7 @@ State lives under `platformdirs` user dirs, namespaced by mkcd2app version (stat
 moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`). `mkc`'s own
 compiler/extension caches aren't covered by this.
  
-Config: `version`, `project`, `inputs.code` (share_link | git | github | path),
+Config: `version`, `project`, `inputs.code` (share_link | git | github | path | file),
 `inputs.assets.icon` (optional), `build_dir`, `target` (required, strict `x.y.z`),
 `outputs` (static | static-singlefile | electron | tauri). `git` takes `url` (pydantic
 `AnyUrl`: https/http/git/file, or ssh:// which needs an `ssh` binary) and an optional
@@ -99,8 +100,10 @@ alias, `{value: <http url>, checkout: <ref, default "master">}`, kept for existi
 configs; `fetch_code` handles both in one `case`.
  
 ## Status
-- **Done:** `static` and `static-singlefile` outputs; all code sources; toolchain/target
-  split. Everything that needs the network is vendored at install time **except MakeCode
+- **Done:** `static` and `static-singlefile` outputs; all code sources, including
+  `file` (a PNG or UF2 downloaded from the editor, detected by magic bytes; decoded by
+  `build_project/inputs/embedded_source.py`, and `fetch_code` warns if `pxt.json`'s
+  `targetVersions.target` differs from `target`); toolchain/target split. Everything that needs the network is vendored at install time **except MakeCode
   extensions**, which are fetched per game; `mkc`'s extension cache isn't redirected.
 - **Not implemented:** Electron and Tauri. The models and result fields exist, but
   `build_project` has no `case` arms for them.
@@ -118,13 +121,16 @@ configs; `fetch_code` handles both in one `case`.
   `clone_and_checkout` against a local repo built with Dulwich (default branch, branch,
   tag, short/full SHA, the same-tree-as-HEAD regression, unknown ref), so it runs
   offline. Fixture commits pass `sign=False`, since Dulwich honours a user's
-  `commit.gpgsign`. Nothing covers the redun patches yet.
+  `commit.gpgsign`. `test_embedded_source.py` covers the `file` source with synthetic
+  PNG (including overflow rows) and UF2 (LZMA and plain) round trips, error cases and
+  path traversal. Its real "falling duck" PNG/UF2 tests skip until those files are
+  added to `tests/fixtures/embedded/`. Nothing covers the redun patches yet.
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
 2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
    it for out-of-band input changes). Still belongs in the README once that exists.
-3. More unit/integration tests, including the redun patches (`git` sources are covered).
+3. More unit/integration tests, including the redun patches (`git` and `file` sources are covered).
 4. Electron, then Tauri (reference: `main`).
 5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
 6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning
@@ -178,7 +184,7 @@ configs; `fetch_code` handles both in one `case`.
 ## Known issues
 - **Out-of-band inputs (by design):** `fetch_code` and
   `copy_support_files` only take the config YAML, so redun can't see changes to a
-  `path` code source, a `git`/`github` branch checkout (or omitted `ref`), an icon path/URL, or the installed
+  `path` or `file` code source, a `git`/`github` branch checkout (or omitted `ref`), an icon path/URL, or the installed
   simulator HTML. Editing a path-sourced game returns the old cached build until
   `--full-rebuild`. Decided to rely on that flag for all sources rather than track
   each one.

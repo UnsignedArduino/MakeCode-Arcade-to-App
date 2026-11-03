@@ -2,7 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import AnyUrl, BaseModel, Field, HttpUrl, RootModel
 
-# Source code can be a share link, git repo, or a path on disk
+# Source code can be a share link, git repo, a path on disk, or a PNG/UF2 file
+# downloaded from the editor with the project embedded
 
 
 class ShareLinkCodeSource(BaseModel):
@@ -36,9 +37,20 @@ class PathCodeSource(BaseModel):
     value: str
 
 
+class FileCodeSource(BaseModel):
+    """A PNG or UF2 downloaded from the MakeCode editor with the project embedded."""
+
+    type: Literal["file"]
+    value: str
+
+
 CodeSource = RootModel[
     Annotated[
-        ShareLinkCodeSource | GitCodeSource | GitHubCodeSource | PathCodeSource,
+        ShareLinkCodeSource
+        | GitCodeSource
+        | GitHubCodeSource
+        | PathCodeSource
+        | FileCodeSource,
         Field(discriminator="type"),
     ]
 ]

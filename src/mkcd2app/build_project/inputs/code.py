@@ -9,8 +9,10 @@ from PIL import Image
 from redun import task
 from redun.file import ContentDir, ContentFile
 
+from mkcd2app.build_project.inputs.embedded_source import extract_project
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import (
+    FileCodeSource,
     GitCodeSource,
     GitHubCodeSource,
     PathAssetSource,
@@ -25,6 +27,20 @@ from mkcd2app.utils.paths import get_js_tools_bin_dir, get_sim_html_path
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
+
+
+def _warn_on_target_mismatch(pxt_json_path: Path, target: str) -> None:
+    """Warn if the project was saved with a different Arcade version than target."""
+    try:
+        pxt_json = json.loads(pxt_json_path.read_text(encoding="utf-8"))
+        saved = pxt_json["targetVersions"]["target"]
+    except OSError, ValueError, KeyError, TypeError:
+        logger.debug(f"Could not read targetVersions.target from {pxt_json_path}")
+        return
+    if saved != target:
+        logger.warning(
+            f"Project was saved with Arcade {saved}, building against {target}"
+        )
 
 
 @task(namespace="mkcd2app")
@@ -65,6 +81,15 @@ def fetch_code(config_yaml: str) -> ContentDir:
         case PathCodeSource(value=path):
             logger.debug(f"Copying source code from {path}")
             shutil.copytree(path, code_path)
+        case FileCodeSource(value=path):
+            logger.debug(f"Extracting embedded project from {path}")
+            src_file = Path(path)
+            if not src_file.is_file():
+                raise FileNotFoundError(f"Code source file not found: {src_file}")
+            # Raises EmbeddedSourceError (with the file path) if there's no project
+            files = extract_project(src_file, code_path)
+            logger.debug(f"Extracted {len(files)} files: {', '.join(files)}")
+            _warn_on_target_mismatch(code_path / "pxt.json", config.target)
 
     mkc_json_path = code_path / "mkc.json"
     logger.debug("Writing mkc.json")
