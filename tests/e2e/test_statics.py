@@ -8,6 +8,8 @@ import pytest
 
 TARGET_VERSION = "4.0.14"
 BUILD_DIR = Path("examples/testing/empty_game_build")
+FILE_BUILD_DIR = Path("examples/testing/empty_game_file_build")
+FIXTURES = Path("tests/fixtures")
 
 
 def run_mkcd2app(*args: str) -> subprocess.CompletedProcess[str]:
@@ -105,3 +107,24 @@ def test_empty_game_build_to_statics_second_build_caches(
     assert totals["DONE"] == 0 and totals["CACHED"] == totals["TOTAL"], (
         f"expected every job on the second build to hit the cache, got {totals}"
     )
+
+
+def test_empty_game_file_source_build_to_static() -> None:
+    # Same empty game, but exported as a PNG from the 4.0.14 editor (`file` source)
+    yaml_path = Path.cwd() / FIXTURES / "empty_game_file_source.yaml"
+    try:
+        result = run_mkcd2app("build", str(yaml_path), "--full-rebuild")
+
+        source = FILE_BUILD_DIR / "empty-game-source"
+        expected = FIXTURES / "empty_game" / "main.ts"
+        assert (source / "main.ts").read_bytes() == expected.read_bytes()
+        assert (source / "mkc.json").is_file(), "expected mkc.json written"
+        # The PNG was saved with the same Arcade version as `target`
+        output = result.stdout + result.stderr
+        assert "Project was saved with Arcade" not in output
+
+        static_dist = FILE_BUILD_DIR / "empty-game-website-filled-built" / "dist"
+        assert (static_dist / "index.html").is_file(), "expected index.html present"
+        assert list((static_dist / "assets").glob("*.js")), "expected js files"
+    finally:
+        shutil.rmtree(Path.cwd() / FILE_BUILD_DIR, ignore_errors=True)

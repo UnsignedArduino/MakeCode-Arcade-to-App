@@ -24,6 +24,8 @@ from mkcd2app.models.config import FileCodeSource
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "embedded"
 DUCK_UF2 = FIXTURES / "falling-duck.uf2"
 DUCK_PNG = FIXTURES / "falling-duck.png"
+EMPTY_PNG = FIXTURES / "empty-game.png"
+EMPTY_GAME_DIR = Path(__file__).parent.parent / "fixtures" / "empty_game"
 DUCK_FILES = {"README.md", "assets.json", "main.blocks", "main.ts", "pxt.json"}
 DUCK_MAIN_TS_SHA256 = "2100e5d1f310a31abac094e6173c66b7394c18a67c466baa9a655623feded775"
 
@@ -139,12 +141,6 @@ def _write_uf2(path: Path, binary: bytes, base: int = 0x2000) -> None:
 # ------------------------------------------------------ real fixtures ---------
 
 
-needs_duck = pytest.mark.skipif(
-    not (DUCK_UF2.exists() and DUCK_PNG.exists()),
-    reason="falling-duck fixtures not present in tests/fixtures/embedded",
-)
-
-
 def _check_duck(files: dict[str, str]) -> None:
     assert set(files) == DUCK_FILES
     main_ts = files["main.ts"]
@@ -153,24 +149,37 @@ def _check_duck(files: dict[str, str]) -> None:
     assert hashlib.sha256(main_ts.encode()).hexdigest() == DUCK_MAIN_TS_SHA256
     pxt = json.loads(files["pxt.json"])
     assert pxt["name"] == "falling duck"
-    assert {"device", "animation"} <= set(pxt["dependencies"])
+    assert set(pxt["dependencies"]) == {"device", "animation"}
+    assert pxt["targetVersions"]["target"] == "4.1.27"
 
 
-@needs_duck
 def test_duck_uf2() -> None:
     _check_duck(read_embedded_files(DUCK_UF2))
 
 
-@needs_duck
 def test_duck_png_matches_uf2() -> None:
+    # Both were exported from 4.1.27 in the same session, so every file matches
     png = read_embedded_files(DUCK_PNG)
     _check_duck(png)
-    uf2 = read_embedded_files(DUCK_UF2)
-    for name in ("main.ts", "README.md", "assets.json"):
-        assert png[name] == uf2[name]
+    assert png == read_embedded_files(DUCK_UF2)
 
 
-@needs_duck
+def test_empty_game_png_matches_fixture_dir() -> None:
+    # Exported from the 4.0.14 editor; only the project name differs from the
+    # checked-in tests/fixtures/empty_game
+    files = read_embedded_files(EMPTY_PNG)
+    assert set(files) == {p.name for p in EMPTY_GAME_DIR.iterdir()}
+    for name, content in files.items():
+        expected = (EMPTY_GAME_DIR / name).read_text(encoding="utf-8")
+        if name == "pxt.json":
+            got_pxt, expected_pxt = json.loads(content), json.loads(expected)
+            assert got_pxt.pop("name") == "empty_game"
+            expected_pxt.pop("name")
+            assert got_pxt == expected_pxt
+        else:
+            assert content == expected
+
+
 def test_duck_extract(tmp_path: Path) -> None:
     names = extract_project(DUCK_UF2, tmp_path / "out")
     assert set(names) == DUCK_FILES

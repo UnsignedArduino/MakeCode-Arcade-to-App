@@ -123,8 +123,13 @@ configs; `fetch_code` handles both in one `case`.
   offline. Fixture commits pass `sign=False`, since Dulwich honours a user's
   `commit.gpgsign`. `test_embedded_source.py` covers the `file` source with synthetic
   PNG (including overflow rows) and UF2 (LZMA and plain) round trips, error cases and
-  path traversal. Its real "falling duck" PNG/UF2 tests skip until those files are
-  added to `tests/fixtures/embedded/`. Nothing covers the redun patches yet.
+  path traversal, plus real editor exports in `tests/fixtures/embedded/`: the
+  "falling duck" PNG (512×424) and UF2, both saved from 4.1.27 and identical once
+  decoded, and `empty-game.png` from 4.0.14, which matches `tests/fixtures/empty_game`
+  except for the `pxt.json` name. The e2e suite also builds `empty-game.png` through
+  `empty_game_file_source.yaml`. The duck builds end to end on 4.1.27, and on 4.0.14
+  with the version-mismatch warning, but isn't in e2e. Nothing covers the redun
+  patches yet.
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
