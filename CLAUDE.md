@@ -17,7 +17,9 @@ uv sync                          # install deps + the mkcd2app entry point
 uv run ruff check .              # lint
 uv run ruff format --check .     # format check (drop --check to apply)
 uv run mypy .                    # strict type check
-uv run pytest                    # all tests
+uv run pytest                    # all tests, with a coverage report
+uv run pytest -m unit            # only the fast offline tests (tests/unit)
+uv run pytest --no-cov           # skip coverage (e.g. when using a debugger)
 uv run pytest tests/e2e/test_statics.py::test_empty_game_build_to_statics_static
 ```
 
@@ -31,6 +33,16 @@ uv run mkcd2app toolchain install
 uv run mkcd2app target install 4.0.14
 uv run mkcd2app --debug build "examples/Racers.yaml"
 ```
+
+Notes on the unit tests:
+- `tests/conftest.py` marks every test `unit` or `e2e` by its directory, and holds
+  the `mkcd2app_home` fixture (points `MKCD2APP_HOME` at a temp dir). Keep it the only
+  `conftest.py`: mypy fails on two modules both named `conftest`.
+- Shared helpers (`make_config_yaml`, `FakeRunCmd`, `capture_logger`, ...) are in
+  `tests/unit/helpers.py`, imported as `from helpers import ...`.
+- Call a redun task's plain function with `.func(...)`, and monkeypatch `run_cmd` in
+  the module under test, so no `npm`/`mkc` runs.
+- Our loggers set `propagate = False`, so `caplog` needs `capture_logger` to see them.
 
 Notes on the e2e tests:
 - Run pytest from the repo root: tests use `Path.cwd()` and repo-relative paths, and
