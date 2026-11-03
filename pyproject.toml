@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4",
     "pillow",
     "platformdirs>=4.11.0",
+    "dulwich>=1.2.20",
 ]
 
 [project.scripts]

@@ -54,7 +54,7 @@ def build_project(config_yaml: str) -> BuildProjectResult:
         template_path = stack.enter_context(get_resource_template_path("vite-project"))
         template_content = ContentDir(str(template_path))
 
-        # Fetch game source code with `mkc`, `git`, or copy from disk
+        # Fetch game source code with `mkc`, dulwich (git), or copy from disk
         code_path = fetch_code(config_yaml)
         # Build binary.js with `mkc`
         bin_js_path = build_binary_js(config_yaml, code_path)

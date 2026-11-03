@@ -2,7 +2,8 @@
  
 _Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
 small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29.
-External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03._
+External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03, then
+updated for the Dulwich git replacement the same day._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -31,7 +32,7 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `config/`, `models/` | YAML loader; pydantic `BuildConfig`, `BinaryJSMetadata` |
 | `build_project/` | `build_project` task, website tasks, code inputs |
 | `toolchain/`, `target/` | install/uninstall tasks |
-| `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver |
+| `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
 Other: `tests/e2e/test_statics.py`, `tests/fixtures/`, `examples/` (Racers), CI
@@ -58,13 +59,16 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
   `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes). No
   tests cover them yet.
 ## External programs
-`run_cmd` only ever runs `npm`, `mkc` and `git` (as of `4d518d9`):
+`run_cmd` only ever runs `npm` and `mkc`:
 - **Node.js ≥ 22.12 + npm, on PATH. Always required.** The floor comes from
   `@rolldown/plugin-babel` (`>=22.12.0`); vite 8 / rolldown accept `^20.19 || >=22.12`,
   `makecode` only needs ≥14. `mkc` is a Node script, so `node` must be on PATH too.
   Nothing declares or checks this yet. Distro Node packages (e.g. Ubuntu apt) are too old.
-- **git, on PATH. Only for `github` code sources** (`clone --filter=blob:none`, then
-  `checkout`).
+- **Not git:** `github` code sources are cloned with Dulwich (pure Python,
+  `utils/git.py`). Branches/tags get `depth=1` + `branch=`; anything else is taken as a
+  (short) SHA and gets a full clone + `porcelain.checkout`. That clone checks out the
+  default branch first, because Dulwich's checkout only writes files that differ from
+  the current HEAD tree and leaves an empty worktree when the target's tree matches HEAD.
 - **Not needed:** system Python (uv downloads 3.14), a C compiler (all Python deps have
   wheels except `redun`, which is a pure-Python sdist), npm native build tools
   (rolldown/lightningcss ship prebuilt optional binaries; `fsevents` is macOS-only).
@@ -149,9 +153,9 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
    - **Electron:** `toolchain install` pre-fetches the Electron (and electron-builder
      helper) binaries into a redirected cache so the offline `npm ci` still works.
      Cross-building, e.g. Windows targets from macOS/Linux, needs Wine; out of scope.
-   - **Drop the `git` binary:** use Dulwich (pure Python; Rust speedups are optional) for
-     clone + checkout. Don't rely on partial clone: `depth=1` + `branch=` for
-     branches/tags, a full clone for arbitrary SHAs. Generalise the source to
+   - ~~**Drop the `git` binary**~~ (done: Dulwich clone + checkout, `depth=1` +
+     `branch=` for branches/tags, full clone for SHAs; see External programs). Still to
+     do: generalise the source to
      `git: {url, ref}` (any host: GitLab, Codeberg, self-hosted) and keep `github` as an
      alias. Private repos need credentials handled by us (no system credential helper).
      pygit2 (libgit2 bundled in its wheels) is the compiled alternative.

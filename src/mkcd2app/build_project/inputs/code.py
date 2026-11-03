@@ -18,6 +18,7 @@ from mkcd2app.models.config import (
     UrlAssetSource,
 )
 from mkcd2app.utils.filesystem import rmtree_robust
+from mkcd2app.utils.git import clone_and_checkout
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.paths import get_js_tools_bin_dir, get_sim_html_path
 from mkcd2app.utils.run import run_cmd
@@ -56,20 +57,8 @@ def fetch_code(config_yaml: str) -> ContentDir:
             )
         case GitHubCodeSource(value=url, checkout=checkout_target):
             logger.debug(f"Cloning source code from {url}@{checkout_target}")
-            abs_code_path = code_path.resolve()
-            abs_code_path.parent.mkdir(parents=True, exist_ok=True)
-            run_cmd(
-                [
-                    "git",
-                    "clone",
-                    "--filter=blob:none",
-                    "--no-checkout",
-                    str(url),
-                    str(abs_code_path),
-                ],
-                cwd=abs_code_path.parent,
-            )
-            run_cmd(["git", "checkout", checkout_target], cwd=abs_code_path)
+            code_path.parent.mkdir(parents=True, exist_ok=True)
+            clone_and_checkout(str(url), code_path, checkout_target)
         case PathCodeSource(value=path):
             logger.debug(f"Copying source code from {path}")
             shutil.copytree(path, code_path)
