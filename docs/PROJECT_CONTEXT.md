@@ -4,7 +4,8 @@ _Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
 small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29.
 External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03, then
 updated for the Dulwich git replacement and the generic `git` code source the same day,
-and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the same day._
+and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the same day.
+Test suite section updated for the unit test expansion on 2026-11-03._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -36,7 +37,7 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
-Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, PNG/UF2/ZIP file source), `tests/fixtures/`, `examples/` (Racers), CI
+Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, PNG/UF2/ZIP file source, code/website tasks, redun patches, utils), `tests/fixtures/`, `examples/` (Racers), CI
 workflows `lint.yaml` (ubuntu) and `e2e.yaml` (ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
  
@@ -57,8 +58,8 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
   `build_website*` task copies that `node_modules` into its own copy of the filled site
   and runs only `npm run build*`.
 - **redun patches** (`_redun_compat.py`): `get_proto` (Windows drive letters),
-  `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes). No
-  tests cover them yet.
+  `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes).
+  Covered by `tests/unit/test_redun_compat.py`.
 ## External programs
 `run_cmd` only ever runs `npm` and `mkc`:
 - **Node.js ≥ 22.12 + npm, on PATH. Always required.** The floor comes from
@@ -138,14 +139,26 @@ configs; `fetch_code` handles both in one `case`.
   `empty_game_file_source.yaml`, and a ZIP of `tests/fixtures/empty_game` made at test
   time with a GitHub-style `empty_game-master/` wrapper (checked byte for byte
   against the checkout, so CRLF on Windows is fine). The duck builds end to end on 4.1.27, and on 4.0.14
-  with the version-mismatch warning, but isn't in e2e. Nothing covers the redun
-  patches yet.
+  with the version-mismatch warning, but isn't in e2e.
+- `test_code.py` and `test_website.py` run every code-input and website task through
+  `.func` with `run_cmd` (and `clone_and_checkout`, `requests.get`,
+  `get_sim_html_path`) monkeypatched, against a copy of the real bundled template.
+  `test_redun_compat.py` checks the `get_proto` patch and that directory hashes
+  ignore mtimes but change with content, file adds/removes/renames, and path.
+  `utils/` (`paths`, `run`, `filesystem`, `resources`) and `extract_meta_comment` have
+  their own small tests. Untested: `cli.py`, `main.py`, the `build_project` DAG
+  wiring, toolchain/target install tasks, and `is_strict_semver`.
+- pytest config is in `pyproject.toml`: coverage on by default (`--no-cov` to skip),
+  `--strict-markers`, and `unit`/`e2e` markers applied by `tests/conftest.py`. Unit
+  tests cover about 66% of `src/mkcd2app` (run `uv run pytest -m unit`).
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
 2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
    it for out-of-band input changes). Still belongs in the README once that exists.
-3. More unit/integration tests, including the redun patches (`git` and `file` sources are covered).
+3. More unit/integration tests: `cli.py`/`main.py`, `build_project` wiring with
+   `run_cmd` stubbed, and the toolchain/target install tasks (redun patches, code and
+   website tasks, and utils are covered).
 4. Electron, then Tauri (reference: `main`).
 5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
 6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning
