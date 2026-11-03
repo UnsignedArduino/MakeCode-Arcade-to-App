@@ -11,19 +11,19 @@ from mkcd2app.utils.logger import create_logger
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def clone_and_checkout(url: str, path: Path, checkout_target: str) -> None:
+def clone_and_checkout(url: str, path: Path, ref: str | None = None) -> None:
     """
     Clone a git repository and check out a branch, tag, or commit, using dulwich
     (pure Python) so no `git` executable is needed.
 
-    Branches and tags get a shallow (depth 1) clone. Anything else is treated as a
-    (possibly abbreviated) commit SHA, which needs a full clone because a shallow
-    clone can only fetch refs the server advertises.
+    The default branch, branches, and tags get a shallow (depth 1) clone. Anything
+    else is treated as a (possibly abbreviated) commit SHA, which needs a full clone
+    because a shallow clone can only fetch refs the server advertises.
 
-    :param url: The URL of the repository to clone.
+    :param url: The URL (or local path) of the repository to clone.
     :param path: The directory to clone into. Must not exist or be empty.
-    :param checkout_target: A branch name, tag name, or (possibly abbreviated)
-     commit SHA.
+    :param ref: A branch name, tag name, or (possibly abbreviated) commit SHA. None
+     checks out the remote's default branch.
     """
     # dulwich writes \r-separated progress to errstream, which floods non-TTY logs
     # (like CI), so only show it with --debug
@@ -31,21 +31,21 @@ def clone_and_checkout(url: str, path: Path, checkout_target: str) -> None:
     with open(os.devnull, "wb") as devnull:
         errstream: BinaryIO = sys.stderr.buffer if show_progress else devnull
         try:
-            logger.debug(f"Shallow cloning {url}@{checkout_target} to {path}")
+            logger.debug(f"Shallow cloning {url}@{ref or 'default branch'} to {path}")
             with porcelain.clone(
                 url,
                 str(path),
                 depth=1,
-                branch=checkout_target,
+                branch=ref,
                 errstream=errstream,
             ):
                 return
         except ValueError:
-            # dulwich raises ValueError (and removes the directory) when
-            # checkout_target isn't a branch or tag on the remote
-            logger.debug(
-                f"{checkout_target!r} is not a branch or tag, assuming a commit SHA"
-            )
+            # dulwich raises ValueError (and removes the directory) when ref isn't
+            # a branch or tag on the remote. That can't happen with ref=None.
+            if ref is None:
+                raise
+            logger.debug(f"{ref!r} is not a branch or tag, assuming a commit SHA")
 
         logger.debug(f"Cloning {url} to {path}")
         # Check out the default branch first: dulwich's checkout only writes files
@@ -54,10 +54,10 @@ def clone_and_checkout(url: str, path: Path, checkout_target: str) -> None:
         with porcelain.clone(url, str(path), errstream=errstream):
             pass
 
-    logger.debug(f"Checking out {checkout_target}")
+    logger.debug(f"Checking out {ref}")
     try:
-        porcelain.checkout(str(path), checkout_target)
+        porcelain.checkout(str(path), ref)
     except KeyError:
         raise ValueError(
-            f"Could not find branch, tag, or commit {checkout_target!r} in {url}"
+            f"Could not find branch, tag, or commit {ref!r} in {url}"
         ) from None

@@ -3,7 +3,7 @@
 _Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
 small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29.
 External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03, then
-updated for the Dulwich git replacement the same day._
+updated for the Dulwich git replacement and the generic `git` code source the same day._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -35,7 +35,7 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
-Other: `tests/e2e/test_statics.py`, `tests/fixtures/`, `examples/` (Racers), CI
+Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`), `tests/fixtures/`, `examples/` (Racers), CI
 workflows `lint.yaml` (ubuntu) and `e2e.yaml` (ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
  
@@ -64,9 +64,9 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
   `@rolldown/plugin-babel` (`>=22.12.0`); vite 8 / rolldown accept `^20.19 || >=22.12`,
   `makecode` only needs ≥14. `mkc` is a Node script, so `node` must be on PATH too.
   Nothing declares or checks this yet. Distro Node packages (e.g. Ubuntu apt) are too old.
-- **Not git:** `github` code sources are cloned with Dulwich (pure Python,
-  `utils/git.py`). Branches/tags get `depth=1` + `branch=`; anything else is taken as a
-  (short) SHA and gets a full clone + `porcelain.checkout`. That clone checks out the
+- **Not git:** `git` (and `github`) code sources are cloned with Dulwich (pure Python,
+  `utils/git.py`). The default branch and branches/tags get `depth=1` (+ `branch=`);
+  anything else is taken as a (short) SHA and gets a full clone + `porcelain.checkout`. That clone checks out the
   default branch first, because Dulwich's checkout only writes files that differ from
   the current HEAD tree and leaves an empty worktree when the target's tree matches HEAD.
 - **Not needed:** system Python (uv downloads 3.14), a C compiler (all Python deps have
@@ -90,9 +90,13 @@ State lives under `platformdirs` user dirs, namespaced by mkcd2app version (stat
 moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`). `mkc`'s own
 compiler/extension caches aren't covered by this.
  
-Config: `version`, `project`, `inputs.code` (share_link | github | path),
+Config: `version`, `project`, `inputs.code` (share_link | git | github | path),
 `inputs.assets.icon` (optional), `build_dir`, `target` (required, strict `x.y.z`),
-`outputs` (static | static-singlefile | electron | tauri).
+`outputs` (static | static-singlefile | electron | tauri). `git` takes `url` (pydantic
+`AnyUrl`: https/http/git/file, or ssh:// which needs an `ssh` binary) and an optional
+`ref` (branch, tag, or SHA; omitted = the remote's default branch). `github` is the older
+alias, `{value: <http url>, checkout: <ref, default "master">}`, kept for existing
+configs; `fetch_code` handles both in one `case`.
  
 ## Status
 - **Done:** `static` and `static-singlefile` outputs; all code sources; toolchain/target
@@ -110,13 +114,17 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   Nothing yet tests that changing an input does trigger a rebuild.
 - **CI** (`lint.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs into any branch,
   so the stacked PRs get CI. Lint and all three e2e jobs are green on PR #7.
-- Only `tests/e2e` exists; there are no unit or integration tests yet.
+- `tests/unit` covers config parsing of the `git`/`github` sources and
+  `clone_and_checkout` against a local repo built with Dulwich (default branch, branch,
+  tag, short/full SHA, the same-tree-as-HEAD regression, unknown ref), so it runs
+  offline. Fixture commits pass `sign=False`, since Dulwich honours a user's
+  `commit.gpgsign`. Nothing covers the redun patches yet.
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
 2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
    it for out-of-band input changes). Still belongs in the README once that exists.
-3. Unit/integration tests, including the redun patches.
+3. More unit/integration tests, including the redun patches (`git` sources are covered).
 4. Electron, then Tauri (reference: `main`).
 5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
 6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning
@@ -154,10 +162,11 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
      helper) binaries into a redirected cache so the offline `npm ci` still works.
      Cross-building, e.g. Windows targets from macOS/Linux, needs Wine; out of scope.
    - ~~**Drop the `git` binary**~~ (done: Dulwich clone + checkout, `depth=1` +
-     `branch=` for branches/tags, full clone for SHAs; see External programs). Still to
-     do: generalise the source to
-     `git: {url, ref}` (any host: GitLab, Codeberg, self-hosted) and keep `github` as an
-     alias. Private repos need credentials handled by us (no system credential helper).
+     `branch=` for branches/tags, full clone for SHAs; see External programs).
+     ~~Generalise the source to `git: {url, ref}`~~ (done, `github` kept as an alias).
+     Still to do: private repos need credentials handled by us (no system credential
+     helper); a token embedded in the URL would work but gets logged and written to
+     the clone's `.git/config`.
      pygit2 (libgit2 bundled in its wheels) is the compiled alternative.
    - **Distribution:** publish to PyPI so `uvx mkcd2app` / `uv tool install mkcd2app` is
      the install story. A PyInstaller build (one per OS/arch; `--collect-data mkcd2app`;
@@ -169,7 +178,7 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
 ## Known issues
 - **Out-of-band inputs (by design):** `fetch_code` and
   `copy_support_files` only take the config YAML, so redun can't see changes to a
-  `path` code source, a `github` branch checkout, an icon path/URL, or the installed
+  `path` code source, a `git`/`github` branch checkout (or omitted `ref`), an icon path/URL, or the installed
   simulator HTML. Editing a path-sourced game returns the old cached build until
   `--full-rebuild`. Decided to rely on that flag for all sources rather than track
   each one.

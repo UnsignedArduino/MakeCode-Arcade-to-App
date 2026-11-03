@@ -32,7 +32,7 @@ def generate_and_parse_args() -> Namespace:
         "--full-rebuild",
         action="store_true",
         help="Delete the build directory and its cache, then rebuild everything. Use "
-        "this after changing the game's source files, icon, or GitHub branch, since "
+        "this after changing the game's source files, icon, or git branch, since "
         "only changes to the config file are detected automatically.",
     )
 

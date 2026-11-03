@@ -11,6 +11,7 @@ from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import (
+    GitCodeSource,
     GitHubCodeSource,
     PathAssetSource,
     PathCodeSource,
@@ -55,10 +56,12 @@ def fetch_code(config_yaml: str) -> ContentDir:
                 cwd=code_path,
                 which_path=get_js_tools_bin_dir(),
             )
-        case GitHubCodeSource(value=url, checkout=checkout_target):
-            logger.debug(f"Cloning source code from {url}@{checkout_target}")
+        case (
+            GitCodeSource(url=url, ref=ref) | GitHubCodeSource(value=url, checkout=ref)
+        ):
+            logger.debug(f"Cloning source code from {url}@{ref or 'default branch'}")
             code_path.parent.mkdir(parents=True, exist_ok=True)
-            clone_and_checkout(str(url), code_path, checkout_target)
+            clone_and_checkout(str(url), code_path, ref)
         case PathCodeSource(value=path):
             logger.debug(f"Copying source code from {path}")
             shutil.copytree(path, code_path)

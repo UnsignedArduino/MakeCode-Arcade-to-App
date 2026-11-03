@@ -18,7 +18,7 @@ project:
   title: "{NAME} v{VERSION}"
 
 inputs:
-  # Can be share_link, github, or path
+  # Can be share_link, git, or path (github is an older alias for git)
   code:
     type: path
     value: "tests/fixtures/empty_game"

@@ -1,8 +1,8 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, HttpUrl, RootModel
+from pydantic import AnyUrl, BaseModel, Field, HttpUrl, RootModel
 
-# Source code can be a share link, GitHub repo, or a path on disk
+# Source code can be a share link, git repo, or a path on disk
 
 
 class ShareLinkCodeSource(BaseModel):
@@ -10,7 +10,22 @@ class ShareLinkCodeSource(BaseModel):
     value: HttpUrl
 
 
+class GitCodeSource(BaseModel):
+    type: Literal["git"]
+    # Any URL dulwich can clone: https://, http://, git://, file://, or ssh:// (ssh://
+    # needs an `ssh` executable on PATH)
+    url: AnyUrl
+    # Branch, tag, or (possibly abbreviated) commit SHA. None means the remote's
+    # default branch.
+    ref: str | None = None
+
+
 class GitHubCodeSource(BaseModel):
+    """
+    Alias for GitCodeSource, kept so older configs keep working: `value` is the
+    URL and `checkout` is the ref.
+    """
+
     type: Literal["github"]
     value: HttpUrl
     checkout: str = "master"
@@ -23,7 +38,7 @@ class PathCodeSource(BaseModel):
 
 CodeSource = RootModel[
     Annotated[
-        ShareLinkCodeSource | GitHubCodeSource | PathCodeSource,
+        ShareLinkCodeSource | GitCodeSource | GitHubCodeSource | PathCodeSource,
         Field(discriminator="type"),
     ]
 ]
