@@ -4,7 +4,7 @@ _Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
 small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29.
 External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03, then
 updated for the Dulwich git replacement and the generic `git` code source the same day,
-and for the `file` code source (PNG/UF2 with embedded project) the same day._
+and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the same day._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -36,7 +36,7 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
-Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, embedded PNG/UF2 source), `tests/fixtures/`, `examples/` (Racers), CI
+Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, PNG/UF2/ZIP file source), `tests/fixtures/`, `examples/` (Racers), CI
 workflows `lint.yaml` (ubuntu) and `e2e.yaml` (ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
  
@@ -101,9 +101,14 @@ configs; `fetch_code` handles both in one `case`.
  
 ## Status
 - **Done:** `static` and `static-singlefile` outputs; all code sources, including
-  `file` (a PNG or UF2 downloaded from the editor, detected by magic bytes; decoded by
+  `file` (a PNG or UF2 downloaded from the editor, or a ZIP of the project such as
+  GitHub's "Download ZIP", detected by magic bytes; decoded by
   `build_project/inputs/embedded_source.py`, and `fetch_code` warns if `pxt.json`'s
-  `targetVersions.target` differs from `target`); toolchain/target split. Everything that needs the network is vendored at install time **except MakeCode
+  `targetVersions.target` differs from `target`). A ZIP's root is wherever `pxt.json`
+  is: at the top level or inside one wrapping folder (`<repo>-<branch>/`), which is
+  stripped. Everything under it is extracted, binary files included. Symlinks are
+  skipped, and there are entry-count and 512 MB uncompressed limits. It's the way to
+  build a private repo until the `git` source handles credentials; toolchain/target split. Everything that needs the network is vendored at install time **except MakeCode
   extensions**, which are fetched per game; `mkc`'s extension cache isn't redirected.
 - **Not implemented:** Electron and Tauri. The models and result fields exist, but
   `build_project` has no `case` arms for them.
@@ -126,7 +131,10 @@ configs; `fetch_code` handles both in one `case`.
   path traversal, plus real editor exports in `tests/fixtures/embedded/`: the
   "falling duck" PNG (512×424) and UF2, both saved from 4.1.27 and identical once
   decoded, and `empty-game.png` from 4.0.14, which matches `tests/fixtures/empty_game`
-  except for the `pxt.json` name. The e2e suite also builds `empty-game.png` through
+  except for the `pxt.json` name, and `Racers-master.zip` (GitHub "Download ZIP" of
+  Racers, saved with 2.0.48; it builds on 4.0.14 with the mismatch warning but pulls
+  GitHub extensions, so it isn't in e2e). ZIP cases also cover the wrapper folder,
+  no or ambiguous `pxt.json`, symlinks, traversal, the size limit and truncation. The e2e suite also builds `empty-game.png` through
   `empty_game_file_source.yaml`. The duck builds end to end on 4.1.27, and on 4.0.14
   with the version-mismatch warning, but isn't in e2e. Nothing covers the redun
   patches yet.

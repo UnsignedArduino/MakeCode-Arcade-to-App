@@ -1,7 +1,9 @@
 import hashlib
 import json
 import lzma
+import stat
 import struct
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -14,9 +16,11 @@ from mkcd2app.build_project.inputs.embedded_source import (
     UF2_FLAG_NOT_MAIN_FLASH,
     UF2_MAGIC0,
     UF2_MAGIC1,
+    ZIP_MAX_TOTAL_SIZE,
     EmbeddedSourceError,
     extract_project,
     read_embedded_files,
+    read_project_files,
 )
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import FileCodeSource
@@ -25,6 +29,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "embedded"
 DUCK_UF2 = FIXTURES / "falling-duck.uf2"
 DUCK_PNG = FIXTURES / "falling-duck.png"
 EMPTY_PNG = FIXTURES / "empty-game.png"
+RACERS_ZIP = FIXTURES / "Racers-master.zip"  # GitHub "Download ZIP" of Racers
 EMPTY_GAME_DIR = Path(__file__).parent.parent / "fixtures" / "empty_game"
 DUCK_FILES = {"README.md", "assets.json", "main.blocks", "main.ts", "pxt.json"}
 DUCK_MAIN_TS_SHA256 = "2100e5d1f310a31abac094e6173c66b7394c18a67c466baa9a655623feded775"
@@ -266,7 +271,7 @@ def test_uf2_without_source(tmp_path: Path) -> None:
 def test_neither_format(tmp_path: Path) -> None:
     path = tmp_path / "game.txt"
     path.write_text("hello")
-    with pytest.raises(EmbeddedSourceError, match="neither a PNG nor a UF2"):
+    with pytest.raises(EmbeddedSourceError, match="not a PNG, UF2 or ZIP"):
         read_embedded_files(path)
 
 
@@ -287,6 +292,115 @@ def test_path_traversal_rejected(tmp_path: Path, name: str) -> None:
         extract_project(src, dest)
     assert not dest.exists()  # nothing written before the check fails
     assert not (tmp_path / "evil.ts").exists()
+
+
+# -------------------------------------------------------------------- ZIP -----
+
+
+def make_zip(path: Path, entries: dict[str, bytes]) -> None:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in entries.items():
+            zf.writestr(name, data)
+
+
+SAMPLE_BYTES = {k: v.encode() for k, v in SAMPLE_FILES.items()}
+
+
+def test_racers_github_zip(tmp_path: Path) -> None:
+    dest = tmp_path / "out"
+    names = extract_project(RACERS_ZIP, dest)
+    # The Racers-master/ wrapper is stripped and the whole repo is kept
+    assert {"pxt.json", "main.ts", "main.blocks", "test.ts"} <= set(names)
+    assert "assets/js/binary.js" in names
+    assert ".github/workflows/makecode.yml" in names
+    assert not any(n.startswith("Racers-master") for n in names)
+    pxt = json.loads((dest / "pxt.json").read_text(encoding="utf-8"))
+    assert pxt["name"] == "Racers v1.3.2"
+    for name in pxt["files"] + pxt["testFiles"]:
+        assert (dest / name).is_file(), name
+    # Binary files come through untouched
+    with zipfile.ZipFile(RACERS_ZIP) as zf:
+        png = zf.read("Racers-master/.github/makecode/blocks.png")
+    assert (dest / ".github" / "makecode" / "blocks.png").read_bytes() == png
+
+
+@pytest.mark.parametrize("prefix", ["", "Game-main/"])
+def test_zip_root_or_wrapper(tmp_path: Path, prefix: str) -> None:
+    src = tmp_path / "game.zip"
+    entries = {prefix + k: v for k, v in SAMPLE_BYTES.items()}
+    entries[prefix + "assets/img.bin"] = bytes(range(256))
+    make_zip(src, entries)
+    expected = SAMPLE_BYTES | {"assets/img.bin": bytes(range(256))}
+    assert read_project_files(src) == expected
+
+
+def test_zip_keeps_line_endings(tmp_path: Path) -> None:
+    src = tmp_path / "game.zip"
+    make_zip(src, {"pxt.json": b"{}", "main.ts": b"a\r\nb\n"})
+    extract_project(src, tmp_path / "out")
+    assert (tmp_path / "out" / "main.ts").read_bytes() == b"a\r\nb\n"
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [
+        {"main.ts": b""},  # no pxt.json at all
+        {"a/b/pxt.json": b"{}"},  # nested too deep
+        {"a/pxt.json": b"{}", "b/main.ts": b""},  # two top-level folders
+    ],
+)
+def test_zip_without_project_root(tmp_path: Path, entries: dict[str, bytes]) -> None:
+    src = tmp_path / "game.zip"
+    make_zip(src, entries)
+    with pytest.raises(EmbeddedSourceError, match="no pxt.json"):
+        read_project_files(src)
+
+
+def test_zip_skips_symlinks(tmp_path: Path) -> None:
+    src = tmp_path / "game.zip"
+    with zipfile.ZipFile(src, "w") as zf:
+        zf.writestr("pxt.json", b"{}")
+        link = zipfile.ZipInfo("evil")
+        link.external_attr = (stat.S_IFLNK | 0o777) << 16
+        zf.writestr(link, "/etc/passwd")
+    assert read_project_files(src) == {"pxt.json": b"{}"}
+
+
+def test_zip_path_traversal_rejected(tmp_path: Path) -> None:
+    src = tmp_path / "game.zip"
+    make_zip(src, {"pxt.json": b"{}", "../evil.ts": b"x"})
+    dest = tmp_path / "out"
+    with pytest.raises(EmbeddedSourceError, match="Refusing to write outside"):
+        extract_project(src, dest)
+    assert not dest.exists()
+    assert not (tmp_path / "evil.ts").exists()
+
+
+def test_zip_bomb_rejected(tmp_path: Path) -> None:
+    src = tmp_path / "bomb.zip"
+    with zipfile.ZipFile(src, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("pxt.json", b"{}")
+        with zf.open("big.bin", "w", force_zip64=True) as f:
+            chunk = b"\0" * 2**20
+            for _ in range(ZIP_MAX_TOTAL_SIZE // len(chunk) + 1):
+                f.write(chunk)
+    with pytest.raises(EmbeddedSourceError, match="uncompressed"):
+        read_project_files(src)
+
+
+def test_corrupt_zip(tmp_path: Path) -> None:
+    src = tmp_path / "game.zip"
+    make_zip(src, SAMPLE_BYTES)
+    src.write_bytes(src.read_bytes()[:-30])  # cut off the central directory
+    with pytest.raises(EmbeddedSourceError, match="corrupt"):
+        read_project_files(src)
+
+
+def test_read_embedded_files_rejects_zip(tmp_path: Path) -> None:
+    src = tmp_path / "game.zip"
+    make_zip(src, SAMPLE_BYTES)
+    with pytest.raises(EmbeddedSourceError, match="not a PNG or UF2"):
+        read_embedded_files(src)
 
 
 # ----------------------------------------------------------------- config -----

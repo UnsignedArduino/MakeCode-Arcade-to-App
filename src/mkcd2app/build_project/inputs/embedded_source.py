@@ -1,14 +1,19 @@
 """
-Extract the MakeCode project embedded in a downloaded PNG ("shareable image") or
-UF2 file. Mirrors pxt's decoders:
+Extract the MakeCode project from a downloaded file: a PNG ("shareable image") or
+UF2 from the editor, or a ZIP of the project's repo (GitHub's "Download ZIP").
+
+The PNG and UF2 decoders mirror pxt's:
   PNG: pxtlib/util.ts  decodeBlobAsync  -> webapp/src/app.tsx importProjectCoreAsync
   UF2: pxtlib/cpp.ts   unpackSourceFromHexAsync / extractSourceFromBin
 """
 
 import json
 import lzma
+import stat
 import struct
-from pathlib import Path
+import zipfile
+from collections.abc import Callable
+from pathlib import Path, PurePosixPath
 
 from PIL import Image, UnidentifiedImageError
 
@@ -20,6 +25,11 @@ UF2_MAGIC0 = 0x0A324655
 UF2_MAGIC1 = 0x9E5D5157
 UF2_FLAG_NOT_MAIN_FLASH = 0x00000001
 SOURCE_MAGIC = bytes([0x41, 0x14, 0x0E, 0x2F, 0xB8, 0x2F, 0xA2, 0xBB])
+
+ZIP_MAGIC = b"PK\x03\x04"
+# Limits against zip bombs; a big MakeCode repo is a few MB uncompressed
+ZIP_MAX_TOTAL_SIZE = 512 * 1024 * 1024
+ZIP_MAX_ENTRIES = 10_000
 
 
 class EmbeddedSourceError(ValueError):
@@ -142,21 +152,77 @@ def files_from_uf2(path: Path) -> dict[str, str]:
     return _parse_files(text.decode("utf-8"))
 
 
+# ---------------------------------------------------------------- ZIP ---------
+
+
+def _zip_project_root(names: list[str]) -> PurePosixPath:
+    """
+    Find the folder holding pxt.json: the archive root, or the single top-level
+    folder that GitHub's "Download ZIP" wraps everything in (<repo>-<branch>/).
+    """
+    paths = [PurePosixPath(n) for n in names]
+    if PurePosixPath("pxt.json") in paths:
+        return PurePosixPath()
+    tops = {p.parts[0] for p in paths if p.parts}
+    if len(tops) == 1:
+        (top,) = tops
+        if PurePosixPath(top, "pxt.json") in paths:
+            return PurePosixPath(top)
+    raise EmbeddedSourceError(
+        "ZIP has no pxt.json at its root or inside a single top-level folder"
+    )
+
+
+def files_from_zip(path: Path) -> dict[str, bytes]:
+    """Return the project's files as {relative path: bytes}, any wrapper removed."""
+    with zipfile.ZipFile(path) as zf:
+        infos = zf.infolist()
+        if len(infos) > ZIP_MAX_ENTRIES:
+            raise EmbeddedSourceError(f"ZIP has more than {ZIP_MAX_ENTRIES} entries")
+        # Directories and symlinks (stored as small files with a link mode) are
+        # skipped; a MakeCode project has neither
+        members = [
+            i
+            for i in infos
+            if not i.is_dir() and not stat.S_ISLNK(i.external_attr >> 16)
+        ]
+        # file_size is enforced while reading, so the header total is a real bound
+        if sum(i.file_size for i in members) > ZIP_MAX_TOTAL_SIZE:
+            raise EmbeddedSourceError(
+                f"ZIP is over {ZIP_MAX_TOTAL_SIZE // 2**20} MB uncompressed"
+            )
+        root = _zip_project_root([i.filename for i in members])
+        files: dict[str, bytes] = {}
+        for info in members:
+            rel = PurePosixPath(info.filename)
+            if root.parts:
+                if rel.parts[: len(root.parts)] != root.parts:
+                    continue
+                rel = PurePosixPath(*rel.parts[len(root.parts) :])
+            files[str(rel)] = zf.read(info)
+    return files
+
+
 # ------------------------------------------------------------- public --------
 
 
-def read_embedded_files(src: Path) -> dict[str, str]:
-    """Return the embedded project as {filename: content}, detecting PNG vs UF2."""
+def _detect(src: Path) -> str:
+    """Tell PNG, UF2 and ZIP apart by their magic bytes, not the extension."""
     with src.open("rb") as f:
         head = f.read(len(PNG_SIGNATURE))
     if head.startswith(PNG_SIGNATURE):
-        decoder = files_from_png
-    elif len(head) >= 4 and struct.unpack_from("<I", head)[0] == UF2_MAGIC0:
-        decoder = files_from_uf2
-    else:
-        raise EmbeddedSourceError(f"{src} is neither a PNG nor a UF2")
+        return "png"
+    if len(head) >= 4 and struct.unpack_from("<I", head)[0] == UF2_MAGIC0:
+        return "uf2"
+    if head.startswith(ZIP_MAGIC):
+        return "zip"
+    raise EmbeddedSourceError(f"{src} is not a PNG, UF2 or ZIP")
+
+
+def _wrap_errors[T](src: Path, decode: Callable[[Path], T]) -> T:
+    """Run a decoder, turning low-level failures into EmbeddedSourceError."""
     try:
-        return decoder(src)
+        return decode(src)
     except EmbeddedSourceError as e:
         raise EmbeddedSourceError(f"{src}: {e}") from e
     except (
@@ -166,17 +232,38 @@ def read_embedded_files(src: Path) -> dict[str, str]:
         UnicodeDecodeError,
         json.JSONDecodeError,
         UnidentifiedImageError,
+        zipfile.BadZipFile,
+        NotImplementedError,  # ZIP compression method zipfile can't read
+        RuntimeError,  # encrypted ZIP entry
     ) as e:
         raise EmbeddedSourceError(
             f"{src}: embedded MakeCode project is corrupt ({e})"
         ) from e
 
 
+def read_embedded_files(src: Path) -> dict[str, str]:
+    """Return the project in a PNG or UF2 as {filename: text}."""
+    match _detect(src):
+        case "png":
+            return _wrap_errors(src, files_from_png)
+        case "uf2":
+            return _wrap_errors(src, files_from_uf2)
+        case _:
+            raise EmbeddedSourceError(f"{src} is not a PNG or UF2")
+
+
+def read_project_files(src: Path) -> dict[str, bytes]:
+    """Return the project in a PNG, UF2 or ZIP as {relative path: bytes}."""
+    if _detect(src) == "zip":
+        return _wrap_errors(src, files_from_zip)
+    return {k: v.encode("utf-8") for k, v in read_embedded_files(src).items()}
+
+
 def extract_project(src: Path, dest: Path) -> list[str]:
-    """Write the embedded project's files (pxt.json, main.ts, ...) to dest."""
-    files = read_embedded_files(src)
+    """Write the project's files (pxt.json, main.ts, ...) from src to dest."""
+    files = read_project_files(src)
     root = dest.resolve()
-    targets: dict[Path, str] = {}
+    targets: dict[Path, bytes] = {}
     # Check every name before writing anything, since they come from an untrusted file
     for name, content in files.items():
         out = (root / name).resolve()
@@ -187,5 +274,5 @@ def extract_project(src: Path, dest: Path) -> list[str]:
     for out, content in targets.items():
         out.parent.mkdir(parents=True, exist_ok=True)
         # write_bytes so line endings are kept exactly as embedded on every OS
-        out.write_bytes(content.encode("utf-8"))
+        out.write_bytes(content)
     return sorted(files)

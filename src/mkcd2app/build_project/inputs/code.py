@@ -82,7 +82,7 @@ def fetch_code(config_yaml: str) -> ContentDir:
             logger.debug(f"Copying source code from {path}")
             shutil.copytree(path, code_path)
         case FileCodeSource(value=path):
-            logger.debug(f"Extracting embedded project from {path}")
+            logger.debug(f"Extracting project from {path}")
             src_file = Path(path)
             if not src_file.is_file():
                 raise FileNotFoundError(f"Code source file not found: {src_file}")
