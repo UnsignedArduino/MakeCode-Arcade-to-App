@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from mkcd2app.build_project.inputs.embedded_source import read_embedded_files
+
 TARGET_VERSION = "4.0.14"
 BUILD_DIR = Path("examples/testing/empty_game_build")
 FILE_BUILD_DIR = Path("examples/testing/empty_game_file_build")
@@ -116,8 +118,14 @@ def test_empty_game_file_source_build_to_static() -> None:
         result = run_mkcd2app("build", str(yaml_path), "--full-rebuild")
 
         source = FILE_BUILD_DIR / "empty-game-source"
+        # Extraction keeps the embedded bytes exactly, so compare against the PNG's
+        # own contents; the checked-in fixture may have CRLF from git on Windows
+        embedded = read_embedded_files(FIXTURES / "embedded" / "empty-game.png")
+        assert (source / "main.ts").read_bytes() == embedded["main.ts"].encode()
         expected = FIXTURES / "empty_game" / "main.ts"
-        assert (source / "main.ts").read_bytes() == expected.read_bytes()
+        assert (source / "main.ts").read_text(encoding="utf-8") == expected.read_text(
+            encoding="utf-8"
+        )
         assert (source / "mkc.json").is_file(), "expected mkc.json written"
         # The PNG was saved with the same Arcade version as `target`
         output = result.stdout + result.stderr
