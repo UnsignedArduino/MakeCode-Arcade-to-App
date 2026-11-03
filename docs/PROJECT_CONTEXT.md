@@ -1,14 +1,15 @@
 # MakeCode-Arcade-to-App Rewrite — Project Context
-
+ 
 _Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
-small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29._
-
+small known-issue fixes, and the separate deps-install task, and `origin/main` @ `d31e2a5`, as of 2026-10-29.
+External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03._
+ 
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
 static website, Electron app, or Tauri app). The original was basically a bash script
 written in Python. The rewrite turns it into an incremental build system that runs in CI
 and copes with churn in the JS ecosystem.
-
+ 
 ## Branches / PRs
 ```
 main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = dag)
@@ -21,7 +22,6 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
   (`src/convert/website_to_{electron,tauri}/`, `src/templates/{electron,tauri}_files/`).
   The `electron-output`/`tauri-output` branches are merged and out of date. The legacy
   code can't be ported as is; it has to be reimplemented on the new pipeline.
-
 ## Layout (`src/mkcd2app/`)
 | Path | Purpose |
 |---|---|
@@ -33,11 +33,11 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `toolchain/`, `target/` | install/uninstall tasks |
 | `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
-
+ 
 Other: `tests/e2e/test_statics.py`, `tests/fixtures/`, `examples/` (Racers), CI
 workflows `lint.yaml` (ubuntu) and `e2e.yaml` (ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
-
+ 
 ## Architecture
 - **redun `0.44.1`** (pinned) is the DAG engine, embedded via
   `utils/run_redun_task.py`. Each command keeps its own SQLite DB (toolchain, target,
@@ -57,7 +57,19 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
 - **redun patches** (`_redun_compat.py`): `get_proto` (Windows drive letters),
   `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes). No
   tests cover them yet.
-
+## External programs
+`run_cmd` only ever runs `npm`, `mkc` and `git` (as of `4d518d9`):
+- **Node.js ≥ 22.12 + npm, on PATH. Always required.** The floor comes from
+  `@rolldown/plugin-babel` (`>=22.12.0`); vite 8 / rolldown accept `^20.19 || >=22.12`,
+  `makecode` only needs ≥14. `mkc` is a Node script, so `node` must be on PATH too.
+  Nothing declares or checks this yet. Distro Node packages (e.g. Ubuntu apt) are too old.
+- **git, on PATH. Only for `github` code sources** (`clone --filter=blob:none`, then
+  `checkout`).
+- **Not needed:** system Python (uv downloads 3.14), a C compiler (all Python deps have
+  wheels except `redun`, which is a pure-Python sdist), npm native build tools
+  (rolldown/lightningcss ship prebuilt optional binaries; `fsevents` is macOS-only).
+- The offline npm cache holds platform-specific binaries, so it only works on the OS/arch
+  that ran `toolchain install`.
 ## CLI
 Global `--debug` (goes before the subcommand). Commands must run in this order:
 ```
@@ -68,16 +80,16 @@ mkcd2app build <config.yaml> [--full-rebuild]
 Also `toolchain uninstall` and `target uninstall <ver>`. `toolchain status` and
 `target list` are **stubs**. `build` has **no pre-flight checks**: a missing target
 fails with a raw `FileNotFoundError`, a missing toolchain with "Executable 'mkc' not found".
-
+ 
 State lives under `platformdirs` user dirs, namespaced by mkcd2app version (static
 `0.1.0`). A version bump means re-running both installs. Setting `MKCD2APP_HOME`
 moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`). `mkc`'s own
 compiler/extension caches aren't covered by this.
-
+ 
 Config: `version`, `project`, `inputs.code` (share_link | github | path),
 `inputs.assets.icon` (optional), `build_dir`, `target` (required, strict `x.y.z`),
 `outputs` (static | static-singlefile | electron | tauri).
-
+ 
 ## Status
 - **Done:** `static` and `static-singlefile` outputs; all code sources; toolchain/target
   split. Everything that needs the network is vendored at install time **except MakeCode
@@ -95,7 +107,6 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
 - **CI** (`lint.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs into any branch,
   so the stacked PRs get CI. Lint and all three e2e jobs are green on PR #7.
 - Only `tests/e2e` exists; there are no unit or integration tests yet.
-
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
@@ -104,9 +115,53 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
 3. Unit/integration tests, including the redun patches.
 4. Electron, then Tauri (reference: `main`).
 5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
-6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning UX.
+6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning
+   UX, and cutting external dependencies so that "only uv installed" works for static and
+   Electron outputs:
+   - **Node: managed by default, system as an opt-in.** `toolchain install` downloads the
+     official archive (`nodejs.org/dist/v<ver>/node-v<ver>-<os>-<arch>.{zip|tar.xz}`),
+     verifies it against `SHASUMS256.txt`, and extracts it to `<data dir>/node/<ver>/`
+     (`.zip` on Windows with binaries at the root; `.tar.xz` on macOS/Linux with
+     binaries in `bin/`, keeping symlinks and exec bits; musl needs the unofficial
+     builds). It's a redun task keyed on the version and removed by `toolchain uninstall`.
+     Nothing is added to the user's PATH.
+     - Fallback idea: depend on the `nodejs-wheel` PyPI package (official binaries as
+       wheels) instead of writing download code, at the cost of not choosing the Node
+       version.
+   - **Opting into a global Node/Rust:** a per-tool source of `managed | system | <path>`,
+     set with `toolchain install --node=… --rust=…` (persisted in the toolchain state so
+     `build` uses the same choice), overridable by `MKCD2APP_NODE` / `MKCD2APP_RUST` env
+     vars (useful in CI, e.g. after `actions/setup-node`). `system` resolves from the
+     user's PATH; `<path>` points at a specific install dir. In both, mkcd2app checks the
+     version (Node ≥ 22.12; Rust per Tauri's MSRV) and fails with a clear message instead
+     of downloading. `toolchain status` reports which source and version are active.
+   - **`run_cmd` gets an `env=`**, built by one helper that prepends the selected
+     Node/cargo bin dirs to the child's `PATH` (npm and the `mkc` shim run `node` from
+     PATH, so `which_path` alone isn't enough) and redirects caches into mkcd2app dirs:
+     `npm_config_cache`, and later `ELECTRON_CACHE` / `electron_config_cache` and, for a
+     managed Rust, `RUSTUP_HOME` / `CARGO_HOME`.
+   - **Rust: system by default, managed as an opt-in.** Tauri also needs OS packages that
+     need an admin install (MSVC Build Tools + WebView2 on Windows, Xcode CLT on macOS,
+     `webkit2gtk-4.1`/`libssl-dev` etc. on Linux), so a private rustup alone doesn't give
+     "only uv". `--rust=managed` bootstraps rustup into mkcd2app's own
+     `RUSTUP_HOME`/`CARGO_HOME`. Pre-flight checks list the missing OS packages with the
+     install command for that OS. Tauri only builds for the host OS.
+   - **Electron:** `toolchain install` pre-fetches the Electron (and electron-builder
+     helper) binaries into a redirected cache so the offline `npm ci` still works.
+     Cross-building, e.g. Windows targets from macOS/Linux, needs Wine; out of scope.
+   - **Drop the `git` binary:** use Dulwich (pure Python; Rust speedups are optional) for
+     clone + checkout. Don't rely on partial clone: `depth=1` + `branch=` for
+     branches/tags, a full clone for arbitrary SHAs. Generalise the source to
+     `git: {url, ref}` (any host: GitLab, Codeberg, self-hosted) and keep `github` as an
+     alias. Private repos need credentials handled by us (no system credential helper).
+     pygit2 (libgit2 bundled in its wheels) is the compiled alternative.
+   - **Distribution:** publish to PyPI so `uvx mkcd2app` / `uv tool install mkcd2app` is
+     the install story. A PyInstaller build (one per OS/arch; `--collect-data mkcd2app`;
+     check that redun works when frozen; unsigned builds hit Gatekeeper/SmartScreen) is
+     optional and doesn't remove the Tauri OS prerequisites.
+   - **Declare the Node floor:** add `"engines": {"node": ">=22.12"}` to the template's
+     `package.json` and check it in pre-flight.
 7. Later: code signing, auto-update, README (currently a stub), schema docs.
-
 ## Known issues
 - **Out-of-band inputs (by design):** `fetch_code` and
   `copy_support_files` only take the config YAML, so redun can't see changes to a
@@ -122,3 +177,4 @@ Config: `version`, `project`, `inputs.code` (share_link | github | path),
   docstring, `get_resource_template_path(name)` ignoring `name`,
   `load_config_from_yaml` raising `AttributeError` on an unknown version, the stale
   `fill_website_template` docstring, and the stray comment in `Racers offline.yaml`.
+ 
