@@ -212,3 +212,11 @@ configs; `fetch_code` handles both in one `case`.
   `load_config_from_yaml` raising `AttributeError` on an unknown version, the stale
   `fill_website_template` docstring, and the stray comment in `Racers offline.yaml`.
  
+- Fixed (from the test-coverage review): `is_strict_semver` accepted a trailing
+  newline (now `fullmatch`), and `BuildConfig.target` is now validated as strict
+  semver at config load. `project.title` is no longer passed through `str.format`:
+  `render_title` substitutes only `{NAME}`/`{VERSION}`/`{AUTHOR}` in one pass and
+  leaves other braces literal. The title is HTML-escaped into `index.html`, and
+  `fill_index_html` raises if the template's `<title>`/favicon markers aren't each
+  present exactly once, instead of silently shipping "vite-project" and no icon.
+  Unit tests for these are still to be written.

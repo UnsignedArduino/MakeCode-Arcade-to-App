@@ -1,6 +1,8 @@
 import base64
+import html
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 
@@ -8,11 +10,84 @@ from redun import task
 from redun.file import ContentDir, ContentFile
 
 from mkcd2app.config import load_config_from_yaml
+from mkcd2app.models.config import Project
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.paths import get_templates_npm_cache_dir
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
+
+
+TITLE_PLACEHOLDER = re.compile(r"\{(NAME|VERSION|AUTHOR)\}")
+
+INDEX_HTML_TITLE_MARKER = "<title>vite-project</title>"
+INDEX_HTML_FAVICON_MARKER = (
+    '<link rel="icon" href="./favicon.ico" type="image/x-icon" />'
+)
+
+
+def render_title(project: Project) -> str:
+    """
+    Substitute ``{NAME}``, ``{VERSION}`` and ``{AUTHOR}`` in ``project.title``.
+
+    Done in a single pass, so substituted values are never expanded again. Any
+    other braces are kept as is (this is deliberately not ``str.format``, which
+    crashes on unknown fields and allows format specs and attribute access).
+
+    :param project: The project metadata.
+    :return: The rendered (unescaped) title.
+    """
+    values = {
+        "NAME": project.name,
+        "VERSION": project.version,
+        "AUTHOR": project.author,
+    }
+    return TITLE_PLACEHOLDER.sub(lambda m: values[m.group(1)], project.title)
+
+
+def _replace_marker_once(text: str, marker: str, replacement: str) -> str:
+    """
+    Replace ``marker`` in ``text``, requiring it to occur exactly once.
+
+    :raises RuntimeError: If the marker is missing or occurs more than once, which
+     means the template has drifted from what the filler expects.
+    """
+    count = text.count(marker)
+    if count != 1:
+        raise RuntimeError(
+            f"Template index.html must contain {marker!r} exactly once, "
+            f"found {count} occurrence(s)"
+        )
+    return text.replace(marker, replacement)
+
+
+def fill_index_html(
+    index_html_text: str, title: str, favicon: bytes | None = None
+) -> str:
+    """
+    Set the title and (optionally) inline the favicon in the template's index.html.
+
+    :param index_html_text: The template's index.html.
+    :param title: The rendered, unescaped title. It is HTML-escaped here.
+    :param favicon: The favicon.ico bytes to inline as a data URI, or None to leave
+     the favicon link alone.
+    :return: The filled index.html.
+    :raises RuntimeError: If a marker the filler relies on is missing.
+    """
+    index_html_text = _replace_marker_once(
+        index_html_text,
+        INDEX_HTML_TITLE_MARKER,
+        f"<title>{html.escape(title, quote=False)}</title>",
+    )
+    if favicon is not None:
+        favicon_b64 = base64.b64encode(favicon).decode("ascii")
+        favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"
+        index_html_text = _replace_marker_once(
+            index_html_text,
+            INDEX_HTML_FAVICON_MARKER,
+            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />',
+        )
+    return index_html_text
 
 
 def _website_dir(build_dir: Path, name: str, suffix: str) -> Path:
@@ -84,28 +159,16 @@ def fill_website_template(
     logger.debug(f"Copying ---simulator.html from {simulator_html_path}")
     shutil.copy(simulator_html_path, asset_path)
 
-    title = config.project.title.format(
-        NAME=config.project.name,
-        VERSION=config.project.version,
-        AUTHOR=config.project.author,
-    )
+    title = render_title(config.project)
     logger.debug(f'Using title "{title}" in index.html')
-    index_html_path = dst / "index.html"
-    index_html_text = index_html_path.read_text(encoding="utf-8")
-    index_html_text = index_html_text.replace(
-        "<title>vite-project</title>", f"<title>{title}</title>"
-    )
-
     favicon_path = Path(support_path.path) / "favicon.ico"
-    if favicon_path.exists():
-        favicon_b64 = base64.b64encode(favicon_path.read_bytes()).decode("ascii")
-        favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"
-        index_html_text = index_html_text.replace(
-            '<link rel="icon" href="./favicon.ico" type="image/x-icon" />',
-            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />',
-        )
+    favicon = favicon_path.read_bytes() if favicon_path.exists() else None
+    index_html_path = dst / "index.html"
+    index_html_text = fill_index_html(
+        index_html_path.read_text(encoding="utf-8"), title, favicon
+    )
+    if favicon is not None:
         logger.debug("Inlined favicon.ico into index.html")
-
     index_html_path.write_text(index_html_text, encoding="utf-8")
 
     logger.debug("Updating package.json")

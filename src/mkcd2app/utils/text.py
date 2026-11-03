@@ -24,12 +24,16 @@ def extract_meta_comment(file_path: Path) -> BinaryJSMetadata:
 
 
 # Thanks Gemini
-STRICT_NUMERIC_SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+STRICT_NUMERIC_SEMVER = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
 
 
 def is_strict_semver(version: str) -> bool:
-    """Validates string using official SemVer 2.0.0 regex pattern."""
-    return bool(STRICT_NUMERIC_SEMVER.match(version))
+    """
+    Whether the string is exactly MAJOR.MINOR.PATCH (no prefix, pre-release, build
+    metadata, or surrounding whitespace).
+    """
+    # fullmatch, not match with ^...$: $ also matches before a trailing newline
+    return STRICT_NUMERIC_SEMVER.fullmatch(version) is not None
 
 
 def raise_for_invalid_strict_semver(version: str) -> None:

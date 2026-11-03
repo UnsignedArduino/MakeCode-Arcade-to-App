@@ -1,6 +1,8 @@
 from typing import Annotated, Literal
 
-from pydantic import AnyUrl, BaseModel, Field, HttpUrl, RootModel
+from pydantic import AnyUrl, BaseModel, Field, HttpUrl, RootModel, field_validator
+
+from mkcd2app.utils.text import raise_for_invalid_strict_semver
 
 # Source code can be a share link, git repo, a path on disk, or a file: a PNG/UF2
 # downloaded from the editor with the project embedded, or a ZIP of the project
@@ -90,6 +92,14 @@ class Inputs(BaseModel):
 
 # Project metadata
 class Project(BaseModel):
+    """
+    ``title`` is the window/page title. The placeholders ``{NAME}``, ``{VERSION}``
+    and ``{AUTHOR}`` are replaced with the matching fields, in a single pass (so a
+    substituted value is never expanded again). Any other text, including other
+    braces such as ``{Game}`` or ``{}``, is kept literally; there is no brace
+    escaping, so ``{{NAME}}`` becomes ``{<name>}``.
+    """
+
     name: str
     path_friendly_name: str
     description: str | None = None
@@ -141,6 +151,12 @@ class BuildConfig(BaseModel):
     build_dir: str = Field(..., alias="build_dir")
     target: str = Field(..., alias="target")
     outputs: list[OutputOption]
+
+    @field_validator("target")
+    @classmethod
+    def _check_target_is_strict_semver(cls, v: str) -> str:
+        raise_for_invalid_strict_semver(v)
+        return v
 
     class Config:
         populate_by_name = True
