@@ -1,6 +1,7 @@
 import re
 import shutil
 import subprocess
+import zipfile
 from collections.abc import Generator
 from pathlib import Path
 
@@ -136,3 +137,42 @@ def test_empty_game_file_source_build_to_static() -> None:
         assert list((static_dist / "assets").glob("*.js")), "expected js files"
     finally:
         shutil.rmtree(Path.cwd() / FILE_BUILD_DIR, ignore_errors=True)
+
+
+def test_empty_game_zip_file_source_build_to_static(tmp_path: Path) -> None:
+    # Zip the checked-in empty game the way GitHub's "Download ZIP" lays it out (one
+    # <repo>-<branch>/ wrapper folder) and build it as a `file` source
+    game_dir = FIXTURES / "empty_game"
+    zip_path = tmp_path / "empty_game-master.zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.mkdir("empty_game-master")
+        for f in sorted(game_dir.iterdir()):
+            zf.write(f, f"empty_game-master/{f.name}")
+
+    build_dir = tmp_path / "build"
+    # as_posix: backslashes in a double-quoted YAML string are escape sequences
+    template = (FIXTURES / "empty_game_file_source.yaml").read_text(encoding="utf-8")
+    yaml_text = template.replace(
+        "tests/fixtures/embedded/empty-game.png", zip_path.as_posix()
+    ).replace("./examples/testing/empty_game_file_build", build_dir.as_posix())
+    assert zip_path.as_posix() in yaml_text and build_dir.as_posix() in yaml_text
+    yaml_path = tmp_path / "empty_game_zip_source.yaml"
+    yaml_path.write_text(yaml_text, encoding="utf-8")
+
+    result = run_mkcd2app("build", str(yaml_path), "--full-rebuild")
+
+    # The wrapper is stripped and every file comes through byte for byte (the ZIP
+    # was made from the checkout, so this holds with CRLF on Windows too)
+    source = build_dir / "empty-game-source"
+    extracted = {p.name for p in source.iterdir()}
+    assert extracted == {p.name for p in game_dir.iterdir()} | {"mkc.json"}
+    for f in game_dir.iterdir():
+        assert (source / f.name).read_bytes() == f.read_bytes(), f.name
+    output = result.stdout + result.stderr
+    assert "Project was saved with Arcade" not in output
+
+    static_dist = build_dir / "empty-game-website-filled-built" / "dist"
+    assert (static_dist / "index.html").is_file(), "expected index.html present"
+    assert list((static_dist / "assets").glob("*.js")), "expected js files"
+    singlefile_dist = build_dir / "empty-game-website-filled-singlefile-built" / "dist"
+    assert [p.name for p in singlefile_dist.iterdir()] == ["index.html"]

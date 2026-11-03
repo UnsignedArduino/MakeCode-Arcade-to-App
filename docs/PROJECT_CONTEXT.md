@@ -135,7 +135,9 @@ configs; `fetch_code` handles both in one `case`.
   Racers, saved with 2.0.48; it builds on 4.0.14 with the mismatch warning but pulls
   GitHub extensions, so it isn't in e2e). ZIP cases also cover the wrapper folder,
   no or ambiguous `pxt.json`, symlinks, traversal, the size limit and truncation. The e2e suite also builds `empty-game.png` through
-  `empty_game_file_source.yaml`. The duck builds end to end on 4.1.27, and on 4.0.14
+  `empty_game_file_source.yaml`, and a ZIP of `tests/fixtures/empty_game` made at test
+  time with a GitHub-style `empty_game-master/` wrapper (checked byte for byte
+  against the checkout, so CRLF on Windows is fine). The duck builds end to end on 4.1.27, and on 4.0.14
   with the version-mismatch warning, but isn't in e2e. Nothing covers the redun
   patches yet.
 ## Roadmap
