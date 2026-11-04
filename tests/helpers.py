@@ -331,7 +331,7 @@ class GameProject:
         self.game = root / "game"
         self.build_dir = root / "build"
         self.config_path = root / "config.yaml"
-        shutil.copytree(FIXTURES / "empty_game", self.game)
+        shutil.copytree(FIXTURES / "mkcd_projects" / "empty_game", self.game)
         self.config: dict[str, Any] = yaml.safe_load(
             make_config_yaml(
                 Path("build"),

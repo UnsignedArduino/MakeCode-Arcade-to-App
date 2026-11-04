@@ -27,9 +27,9 @@ from mkcd2app.build_project.inputs.code import (
 from mkcd2app.utils.paths import get_js_tools_bin_dir
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
-EMPTY_GAME_DIR = FIXTURES / "empty_game"
-EMPTY_PNG = FIXTURES / "embedded" / "empty-game.png"  # saved with 4.0.14
-DUCK_PNG = FIXTURES / "embedded" / "falling-duck.png"  # saved with 4.1.27
+EMPTY_GAME_DIR = FIXTURES / "mkcd_projects" / "empty_game"
+EMPTY_PNG = FIXTURES / "mkcd_projects" / "empty-game.png"  # saved with 4.0.14
+DUCK_PNG = FIXTURES / "mkcd_projects" / "falling-duck.png"  # saved with 4.1.27
 MKC_JSON = {"targetWebsite": f"https://arcade.makecode.com/v{TARGET_VERSION}"}
 
 

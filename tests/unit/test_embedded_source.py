@@ -30,14 +30,15 @@ from mkcd2app.build_project.inputs.embedded_source import (
 from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import FileCodeSource
 
-FIXTURES = Path(__file__).parent.parent / "fixtures" / "embedded"
-DUCK_UF2 = FIXTURES / "falling-duck.uf2"
-DUCK_PNG = FIXTURES / "falling-duck.png"
-EMPTY_PNG = FIXTURES / "empty-game.png"
+FIXTURES = Path(__file__).parent.parent / "fixtures"
+MKCD_PROJECTS = FIXTURES / "mkcd_projects"
+DUCK_UF2 = MKCD_PROJECTS / "falling-duck.uf2"
+DUCK_PNG = MKCD_PROJECTS / "falling-duck.png"
+EMPTY_PNG = MKCD_PROJECTS / "empty-game.png"
 # Made by the real LZMA-JS (see generate.cjs there), which writes emoji as CESU-8
 LZMA_JS = FIXTURES / "lzma-js"
-RACERS_ZIP = FIXTURES / "Racers-master.zip"  # GitHub "Download ZIP" of Racers
-EMPTY_GAME_DIR = Path(__file__).parent.parent / "fixtures" / "empty_game"
+RACERS_ZIP = MKCD_PROJECTS / "Racers-master.zip"  # GitHub "Download ZIP" of Racers
+EMPTY_GAME_DIR = MKCD_PROJECTS / "empty_game"
 DUCK_FILES = {"README.md", "assets.json", "main.blocks", "main.ts", "pxt.json"}
 DUCK_MAIN_TS_SHA256 = "2100e5d1f310a31abac094e6173c66b7394c18a67c466baa9a655623feded775"
 
@@ -185,17 +186,14 @@ def test_duck_png_matches_uf2() -> None:
 
 
 def test_empty_game_png_matches_fixture_dir() -> None:
-    # Exported from the 4.0.14 editor; only the project name differs from the
-    # checked-in tests/fixtures/empty_game
+    # Exported from the 4.0.14 editor; only the formatting of pxt.json differs from
+    # the checked-in tests/fixtures/mkcd_projects/empty_game
     files = read_embedded_files(EMPTY_PNG)
     assert set(files) == {p.name for p in EMPTY_GAME_DIR.iterdir()}
     for name, content in files.items():
         expected = (EMPTY_GAME_DIR / name).read_text(encoding="utf-8")
         if name == "pxt.json":
-            got_pxt, expected_pxt = json.loads(content), json.loads(expected)
-            assert got_pxt.pop("name") == "empty_game"
-            expected_pxt.pop("name")
-            assert got_pxt == expected_pxt
+            assert json.loads(content) == json.loads(expected)
         else:
             assert content == expected
 
@@ -720,13 +718,13 @@ def test_read_embedded_files_rejects_zip(tmp_path: Path) -> None:
 
 
 def test_config_file_source() -> None:
-    yaml_path = Path(__file__).parent.parent / "fixtures"
-    text = (yaml_path / "empty_game_build_to_statics.yaml").read_text(encoding="utf-8")
+    config_path = FIXTURES / "empty_game_path_build_statics.yaml"
+    text = config_path.read_text(encoding="utf-8")
     text = text.replace(
-        'type: path\n    value: "empty_game"',
-        'type: file\n    value: "embedded/falling-duck.png"',
+        'type: path\n    value: "mkcd_projects/empty_game"',
+        'type: file\n    value: "mkcd_projects/falling-duck.png"',
     )
     config = load_config_from_yaml(text)
     assert config.inputs.code.root == FileCodeSource(
-        type="file", value="embedded/falling-duck.png"
+        type="file", value="mkcd_projects/falling-duck.png"
     )

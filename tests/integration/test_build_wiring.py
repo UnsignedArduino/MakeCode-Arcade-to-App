@@ -140,7 +140,7 @@ def test_share_link_source(project: GameProject) -> None:
 
 
 def test_outputs_built_from_a_file_source(project: GameProject) -> None:
-    fixtures = Path(__file__).parent.parent / "fixtures" / "embedded"
+    fixtures = Path(__file__).parent.parent / "fixtures" / "mkcd_projects"
     project.config["inputs"]["code"] = {
         "type": "file",
         "value": str(fixtures / "empty-game.png"),

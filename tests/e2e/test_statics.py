@@ -18,8 +18,10 @@ from mkcd2app.utils.paths import get_sim_html_path
 
 TARGET_VERSION = "4.0.14"
 FIXTURES = Path("tests/fixtures")
-STATICS_CONFIG = "empty_game_build_to_statics.yaml"
-FILE_SOURCE_CONFIG = "empty_game_file_source.yaml"
+MKCD_PROJECTS = "mkcd_projects"  # Next to the configs, which use relative paths
+EMPTY_GAME_DIR = FIXTURES / MKCD_PROJECTS / "empty_game"
+STATICS_CONFIG = "empty_game_path_build_statics.yaml"
+FILE_SOURCE_CONFIG = "empty_game_file_source_build_statics.yaml"
 RACERS_SHARE_LINK = "https://arcade.makecode.com/84426-33815-03715-00484"
 EMPTY_GAME_TITLE = "<title>Empty Game v0.0.1</title>"
 FAVICON = 'href="data:image/x-icon;base64,'
@@ -119,7 +121,7 @@ class Build:
 
 def make_project(root: Path) -> Build:
     """Copy the empty game and its config to a folder, as the config's paths are relative."""
-    shutil.copytree(FIXTURES / "empty_game", root / "empty_game")
+    shutil.copytree(EMPTY_GAME_DIR, root / MKCD_PROJECTS / "empty_game")
     return Build(Path(shutil.copy(FIXTURES / STATICS_CONFIG, root)))
 
 
@@ -261,9 +263,9 @@ def test_empty_game_build_to_statics_second_build_caches(
 
 def test_empty_game_file_source_build_to_static(tmp_path: Path) -> None:
     # Same empty game, but exported as a PNG from the 4.0.14 editor (`file` source)
-    (tmp_path / "embedded").mkdir()
-    png = FIXTURES / "embedded" / "empty-game.png"
-    shutil.copy(png, tmp_path / "embedded")
+    (tmp_path / MKCD_PROJECTS).mkdir()
+    png = FIXTURES / MKCD_PROJECTS / "empty-game.png"
+    shutil.copy(png, tmp_path / MKCD_PROJECTS)
     build = Build(Path(shutil.copy(FIXTURES / FILE_SOURCE_CONFIG, tmp_path)))
 
     result = run_mkcd2app("build", str(build.config))
@@ -272,7 +274,7 @@ def test_empty_game_file_source_build_to_static(tmp_path: Path) -> None:
     # own contents; the checked-in fixture may have CRLF from git on Windows
     embedded = read_embedded_files(png)
     assert (build.source / "main.ts").read_bytes() == embedded["main.ts"].encode()
-    expected = FIXTURES / "empty_game" / "main.ts"
+    expected = EMPTY_GAME_DIR / "main.ts"
     assert (build.source / "main.ts").read_text(encoding="utf-8") == expected.read_text(
         encoding="utf-8"
     )
@@ -287,7 +289,7 @@ def test_empty_game_file_source_build_to_static(tmp_path: Path) -> None:
 def test_empty_game_zip_file_source_build_to_static(tmp_path: Path) -> None:
     # Zip the checked-in empty game the way GitHub's "Download ZIP" lays it out (one
     # <repo>-<branch>/ wrapper folder) and build it as a `file` source
-    game_dir = FIXTURES / "empty_game"
+    game_dir = EMPTY_GAME_DIR
     zip_path = tmp_path / "empty_game-master.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.mkdir("empty_game-master")
@@ -295,7 +297,7 @@ def test_empty_game_zip_file_source_build_to_static(tmp_path: Path) -> None:
             zf.write(f, f"empty_game-master/{f.name}")
 
     template = (FIXTURES / FILE_SOURCE_CONFIG).read_text(encoding="utf-8")
-    yaml_text = template.replace("embedded/empty-game.png", zip_path.name)
+    yaml_text = template.replace(f"{MKCD_PROJECTS}/empty-game.png", zip_path.name)
     assert zip_path.name in yaml_text
     build = Build(tmp_path / "empty_game_zip_source.yaml")
     build.config.write_text(yaml_text, encoding="utf-8")
@@ -317,7 +319,7 @@ def test_empty_game_zip_file_source_build_to_static(tmp_path: Path) -> None:
 
 def test_git_source_build_to_static(tmp_path: Path) -> None:
     # A local repo, so this runs real dulwich without needing the network
-    game_dir = FIXTURES / "empty_game"
+    game_dir = EMPTY_GAME_DIR
     repo = (tmp_path / "repo").resolve()
     shutil.copytree(game_dir, repo)
     porcelain.init(str(repo))

@@ -23,7 +23,7 @@ inputs:
   # an older alias for git.
   code:
     type: path
-    value: "empty_game"
+    value: "mkcd_projects/empty_game"
 
   assets: {}
     # Icon is optional but highly recommended, it will be used as the favicon
