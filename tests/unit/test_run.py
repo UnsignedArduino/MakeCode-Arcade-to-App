@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from mkcd2app.utils import paths
 from mkcd2app.utils.run import BuildError, run_cmd
 
 
@@ -59,3 +60,53 @@ def test_which_path_finds_executable(tmp_path: Path) -> None:
         [exe.name, "-c", "print('found')"], cwd=tmp_path, which_path=exe.parent
     )
     assert out.strip() == "found"
+
+
+def _write_fake_mkc(bin_dir: Path) -> None:
+    """A tiny ``mkc`` that prints ok, runnable through shutil.which on any OS."""
+    bin_dir.mkdir(parents=True)
+    if sys.platform == "win32":
+        (bin_dir / "mkc.cmd").write_text("@echo ok\r\n", encoding="utf-8")
+    else:
+        exe = bin_dir / "mkc"
+        exe.write_text("#!/bin/sh\necho ok\n", encoding="utf-8")
+        exe.chmod(0o755)
+
+
+def test_relative_home_executable_runs_from_other_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Regression: a relative MKCD2APP_HOME gave a relative which_path, so the
+    #  resolved executable didn't exist from the subprocess's cwd
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(paths.HOME_ENV_VAR, "home")
+    _write_fake_mkc(paths.get_js_tools_bin_dir())
+    other = tmp_path / "build"
+    other.mkdir()
+
+    out = run_cmd(
+        ["mkc", "build", "-j"], cwd=other, which_path=paths.get_js_tools_bin_dir()
+    )
+
+    assert out.strip() == "ok"
+
+
+def test_relative_home_cache_dir_is_same_from_other_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Regression: npm got a relative --cache, which it resolved against its own cwd
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(paths.HOME_ENV_VAR, "home")
+    cache = paths.get_templates_npm_cache_dir()
+    other = tmp_path / "build"
+    other.mkdir()
+
+    run_cmd(
+        python("import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True)")
+        + [str(cache)],
+        cwd=other,
+    )
+
+    assert (tmp_path / "home").resolve() in cache.parents
+    assert cache.is_dir()
+    assert not (other / "home").exists()

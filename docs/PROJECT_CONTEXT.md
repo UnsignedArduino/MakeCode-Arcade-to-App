@@ -60,6 +60,9 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
 - **redun patches** (`_redun_compat.py`): `get_proto` (Windows drive letters),
   `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes).
   Covered by `tests/unit/test_redun_compat.py`.
+- **Uninstalls are never cached** (`cache_scope=CacheScope.NONE`): they return
+  `None`, so a cached result couldn't notice a reinstall. Install tasks return
+  `ContentDir`/`ContentFile`, which redun re-validates, so they stay cached.
 ## External programs
 `run_cmd` only ever runs `npm` and `mkc`:
 - **Node.js ≥ 22.12 + npm, on PATH. Always required.** The floor comes from
@@ -89,7 +92,8 @@ fails with a raw `FileNotFoundError`, a missing toolchain with "Executable 'mkc'
  
 State lives under `platformdirs` user dirs, namespaced by mkcd2app version (static
 `0.1.0`). A version bump means re-running both installs. Setting `MKCD2APP_HOME`
-moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`). `mkc`'s own
+moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`); the value is
+`~`-expanded and made absolute, since subprocesses run in other directories. `mkc`'s own
 compiler/extension caches aren't covered by this.
  
 Config: `version`, `project`, `inputs.code` (share_link | git | github | path | file),
@@ -236,3 +240,14 @@ configs; `fetch_code` handles both in one `case`.
   present exactly once, instead of silently shipping "vite-project" and no icon.
   Covered by `tests/unit/test_semver.py` and the `render_title`/`fill_index_html`
   tests in `tests/unit/test_website.py`.
+- Fixed (from the Codex review of PR #7): uninstalls were cached no-ops on a second
+  run (see Architecture); a relative `MKCD2APP_HOME` gave relative `mkc`/`--cache`
+  paths that subprocesses resolved against their own cwd. PNG/UF2 projects with emoji
+  failed to import: LZMA-JS writes CESU-8 (each UTF-16 code unit separately), so the
+  decoder now works in UTF-16 code units, which also keeps UF2 `headerSize` (a JS
+  string length) correct. Fixtures made by real LZMA-JS are in
+  `tests/fixtures/embedded/lzma-js/` (`generate.cjs` regenerates them). UF2 blocks
+  are now reassembled into runs (gaps over 1 MB split a run, like pxt's `toBin`),
+  with payload sizes checked against the 476-byte block limit and a 64 MB total
+  limit, all before allocating, so a tiny file can't ask for gigabytes.
+  `run_redun_task` now closes its SQLite connections after each run.

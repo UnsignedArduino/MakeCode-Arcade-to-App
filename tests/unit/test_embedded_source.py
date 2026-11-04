@@ -4,11 +4,13 @@ import lzma
 import stat
 import struct
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
+from mkcd2app.build_project.inputs import embedded_source
 from mkcd2app.build_project.inputs.embedded_source import (
     PNG_HEADER_SIZE,
     PNG_MAGIC,
@@ -16,6 +18,9 @@ from mkcd2app.build_project.inputs.embedded_source import (
     UF2_FLAG_NOT_MAIN_FLASH,
     UF2_MAGIC0,
     UF2_MAGIC1,
+    UF2_MAX_GAP,
+    UF2_MAX_IMAGE_SIZE,
+    UF2_MAX_PAYLOAD,
     ZIP_MAX_TOTAL_SIZE,
     EmbeddedSourceError,
     extract_project,
@@ -29,6 +34,8 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "embedded"
 DUCK_UF2 = FIXTURES / "falling-duck.uf2"
 DUCK_PNG = FIXTURES / "falling-duck.png"
 EMPTY_PNG = FIXTURES / "empty-game.png"
+# Made by the real LZMA-JS (see generate.cjs there), which writes emoji as CESU-8
+LZMA_JS = FIXTURES / "lzma-js"
 RACERS_ZIP = FIXTURES / "Racers-master.zip"  # GitHub "Download ZIP" of Racers
 EMPTY_GAME_DIR = Path(__file__).parent.parent / "fixtures" / "empty_game"
 DUCK_FILES = {"README.md", "assets.json", "main.blocks", "main.ts", "pxt.json"}
@@ -111,10 +118,18 @@ def _png_blob_for(files: dict[str, str], padding: str = "") -> bytes:
 
 
 def make_project_uf2(
-    path: Path, meta: dict[str, object], text: bytes, pad: int = 1000
+    path: Path,
+    meta: dict[str, object],
+    text: bytes,
+    pad: int = 1000,
+    meta_bytes: bytes | None = None,
 ) -> None:
-    """Embed source the way pxt does, then chunk it into 256-byte UF2 blocks."""
-    meta_bytes = json.dumps(meta).encode()
+    """
+    Embed source the way pxt does, then chunk it into 256-byte UF2 blocks.
+
+    :param meta_bytes: The encoded meta JSON, instead of ``json.dumps(meta)``.
+    """
+    meta_bytes = json.dumps(meta).encode() if meta_bytes is None else meta_bytes
     pre = b"\xaa" * (pad + (-pad % 16))  # source magic must be 16-byte aligned
     binary = (
         pre
@@ -242,6 +257,220 @@ def test_extract_writes_bytes_exactly(tmp_path: Path) -> None:
     assert extract_project(src, dest) == sorted(SAMPLE_FILES)
     for name, content in SAMPLE_FILES.items():
         assert (dest / name).read_bytes() == content.encode("utf-8")
+
+
+# ------------------------------------------------- LZMA-JS text encoding ------
+
+
+def _lzma_js_files() -> dict[str, str]:
+    files: dict[str, str] = json.loads((LZMA_JS / "files.json").read_text("utf-8"))
+    return files
+
+
+def test_lzma_js_fixture_is_cesu8() -> None:
+    # Guards the fixture itself: strict UTF-8 must reject it, or it tests nothing
+    raw = lzma.decompress(
+        (LZMA_JS / "png-project.lzma").read_bytes(), format=lzma.FORMAT_ALONE
+    )
+    assert "😀".encode("utf-16-be").hex().startswith("d83d")
+    assert b"\xed\xa0\xbd\xed\xb8\x80" in raw  # 😀 as two surrogates
+    with pytest.raises(UnicodeDecodeError):
+        raw.decode("utf-8")
+
+
+def test_lzma_js_png_with_emoji(tmp_path: Path) -> None:
+    src = tmp_path / "game.png"
+    make_project_png(160, 120, (LZMA_JS / "png-project.lzma").read_bytes(), src)
+    files = _lzma_js_files()
+    assert read_embedded_files(src) == files
+    assert 'game.splash("hello 😀")' in files["main.ts"]
+
+    dest = tmp_path / "out"
+    extract_project(src, dest)
+    for name, content in files.items():
+        assert (dest / name).read_bytes() == content.encode("utf-8")
+
+
+def test_lzma_js_uf2_with_emoji_in_header(tmp_path: Path) -> None:
+    header_size = int((LZMA_JS / "uf2-header-size.txt").read_text("utf-8"))
+    text = (LZMA_JS / "uf2-source.lzma").read_bytes()
+    src = tmp_path / "game.uf2"
+    make_project_uf2(src, {"compression": "LZMA", "headerSize": header_size}, text)
+    files = _lzma_js_files()
+
+    # The header holds an emoji, so its JS length (UTF-16 code units) is longer than
+    #  its Python length: slicing by characters would cut into the files JSON
+    header = '{"name":"emoji 😀 game","editor":"tsprj"}'
+    assert header_size == len(header.encode("utf-16-le")) // 2 == len(header) + 1
+    assert read_embedded_files(src) == files
+
+    dest = tmp_path / "out"
+    extract_project(src, dest)
+    for name, content in files.items():
+        assert (dest / name).read_bytes() == content.encode("utf-8")
+
+
+def _cesu8(text: str) -> bytes:
+    """Encode like LZMA-JS: each UTF-16 code unit on its own, U+0000 as C0 80."""
+    units = text.encode("utf-16-le")
+    split = "".join(
+        chr(int.from_bytes(units[i : i + 2], "little")) for i in range(0, len(units), 2)
+    )
+    return split.encode("utf-8", "surrogatepass").replace(b"\x00", b"\xc0\x80")
+
+
+@pytest.mark.parametrize("encode", [str.encode, _cesu8], ids=["utf8", "cesu8"])
+def test_uf2_meta_with_emoji(tmp_path: Path, encode: Callable[[str], bytes]) -> None:
+    meta: dict[str, object] = {"name": "emoji 😀 game"}
+    src = tmp_path / "game.uf2"
+    make_project_uf2(
+        src,
+        meta,
+        json.dumps(SAMPLE_FILES).encode(),
+        meta_bytes=encode(json.dumps(meta, ensure_ascii=False)),
+    )
+    assert read_embedded_files(src) == SAMPLE_FILES
+
+
+@pytest.mark.parametrize("encode", [str.encode, _cesu8], ids=["utf8", "cesu8"])
+@pytest.mark.parametrize("text", ["a😀b", "é ✓ 𝄞", "plain"])
+def test_uncompressed_uf2_text_encodings(
+    tmp_path: Path, encode: Callable[[str], bytes], text: str
+) -> None:
+    src = tmp_path / "game.uf2"
+    make_project_uf2(src, {}, encode(json.dumps({"main.ts": text}, ensure_ascii=False)))
+    assert read_embedded_files(src) == {"main.ts": text}
+
+
+def test_cesu8_nul() -> None:
+    # JSON.stringify escapes U+0000, so it never reaches a project, but LZMA-JS
+    #  would write it as C0 80
+    assert _cesu8("a\x00b") == b"a\xc0\x80b"
+    units = embedded_source._cesu8_to_utf16(b"a\xc0\x80b")
+    assert embedded_source._utf16_to_str(units) == "a\x00b"
+
+
+def test_lone_surrogate_is_corrupt(tmp_path: Path) -> None:
+    # Can't be written as UTF-8, so it must fail cleanly rather than at write time
+    project = '{"meta": {}, "source": "{\\"main.ts\\": \\"x\ud83dy\\"}"}'
+    blob = lzma.compress(
+        project.encode("utf-8", "surrogatepass"), format=lzma.FORMAT_ALONE
+    )
+    src = tmp_path / "game.png"
+    make_project_png(160, 120, blob, src)
+    with pytest.raises(EmbeddedSourceError, match="corrupt"):
+        read_embedded_files(src)
+
+
+@pytest.mark.parametrize("header_size", [-1, 10_000, "5"])
+def test_uf2_invalid_header_size(tmp_path: Path, header_size: object) -> None:
+    text = lzma.compress(json.dumps(SAMPLE_FILES).encode(), format=lzma.FORMAT_ALONE)
+    src = tmp_path / "game.uf2"
+    make_project_uf2(src, {"compression": "LZMA", "headerSize": header_size}, text)
+    with pytest.raises(EmbeddedSourceError, match="headerSize"):
+        read_embedded_files(src)
+
+
+# ------------------------------------------------------------ UF2 layout ------
+
+
+def _uf2_block(addr: int, payload: bytes, size: int | None = None) -> bytes:
+    header = struct.pack(
+        "<8I",
+        UF2_MAGIC0,
+        UF2_MAGIC1,
+        0,
+        addr,
+        len(payload) if size is None else size,
+        0,
+        1,
+        0,
+    )
+    return header + payload.ljust(476, b"\x00") + struct.pack("<I", 0x0AB16F30)
+
+
+def _source_payload() -> bytes:
+    text = json.dumps(SAMPLE_FILES).encode()
+    meta = b"{}"
+    return SOURCE_MAGIC + struct.pack("<HI2x", len(meta), len(text)) + meta + text
+
+
+@pytest.fixture
+def allocations(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Record the size of each bytearray the decoder allocates."""
+    sizes: list[int] = []
+
+    def spy(size: int = 0) -> bytearray:
+        sizes.append(size)
+        assert size <= UF2_MAX_IMAGE_SIZE, f"tried to allocate {size} bytes"
+        return bytearray(size)
+
+    monkeypatch.setattr(embedded_source, "bytearray", spy, raising=False)
+    return sizes
+
+
+def test_uf2_far_apart_blocks_not_densified(
+    tmp_path: Path, allocations: list[int]
+) -> None:
+    # Regression: addresses 0 and 0xFFFF0000 asked for a ~4 GiB buffer
+    payload = _source_payload()
+    chunks = [payload[i : i + 256] for i in range(0, len(payload), 256)]
+    blocks = _uf2_block(0, b"\xaa" * 256)
+    for i, chunk in enumerate(chunks):
+        blocks += _uf2_block(0xFFFF0000 + i * 256, chunk)
+    src = tmp_path / "game.uf2"
+    src.write_bytes(blocks)
+
+    assert read_embedded_files(src) == SAMPLE_FILES
+    assert max(allocations) <= len(blocks)
+
+
+def test_uf2_small_gap_is_padded(tmp_path: Path) -> None:
+    # Blocks with a gap (like pxt's toBin pads) still form one image, so the
+    #  source's 16-byte alignment is counted from the lowest address
+    payload = _source_payload()
+    chunks = [payload[i : i + 256] for i in range(0, len(payload), 256)]
+    blocks = _uf2_block(0x1000, b"\xaa" * 256)
+    for i, chunk in enumerate(chunks):
+        blocks += _uf2_block(0x4000 + i * 256, chunk)
+    src = tmp_path / "game.uf2"
+    src.write_bytes(blocks)
+    assert read_embedded_files(src) == SAMPLE_FILES
+
+
+def test_uf2_too_much_memory(tmp_path: Path, allocations: list[int]) -> None:
+    # Each block sits just within the padding gap, so they'd all join one run
+    count = UF2_MAX_IMAGE_SIZE // UF2_MAX_GAP + 2
+    blocks = b"".join(
+        _uf2_block(i * (UF2_MAX_GAP + 256), b"\xaa" * 256) for i in range(count)
+    )
+    src = tmp_path / "game.uf2"
+    src.write_bytes(blocks)
+    with pytest.raises(EmbeddedSourceError, match="MB limit"):
+        read_embedded_files(src)
+    assert allocations == []  # rejected before allocating anything
+
+
+@pytest.mark.parametrize("size", [UF2_MAX_PAYLOAD + 1, 0xFFFFFFFF])
+def test_uf2_oversized_payload(
+    tmp_path: Path, allocations: list[int], size: int
+) -> None:
+    src = tmp_path / "game.uf2"
+    src.write_bytes(_uf2_block(0x2000, _source_payload()[:256], size=size))
+    with pytest.raises(EmbeddedSourceError, match="payload"):
+        read_embedded_files(src)
+    assert allocations == []
+
+
+def test_uf2_max_payload_accepted(tmp_path: Path) -> None:
+    payload = _source_payload()
+    assert len(payload) <= 2 * UF2_MAX_PAYLOAD
+    src = tmp_path / "game.uf2"
+    src.write_bytes(
+        _uf2_block(0x2000, payload[:UF2_MAX_PAYLOAD])
+        + _uf2_block(0x2000 + UF2_MAX_PAYLOAD, payload[UF2_MAX_PAYLOAD:])
+    )
+    assert read_embedded_files(src) == SAMPLE_FILES
 
 
 # ----------------------------------------------------------------- errors -----

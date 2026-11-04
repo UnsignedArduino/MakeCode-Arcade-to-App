@@ -58,3 +58,32 @@ def test_no_override_uses_platformdirs(
     assert paths.get_home_override_dir() is None
     assert paths.get_user_data_dir() == Path(paths.DIRS.user_data_dir) / VERSION
     assert paths.get_user_state_dir() == Path(paths.DIRS.user_state_dir) / VERSION
+
+
+# ------------------------------------------------ relative/tilde overrides ----
+
+
+@pytest.fixture
+def relative_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Set MKCD2APP_HOME to a relative path from tmp_path; return where it points."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(paths.HOME_ENV_VAR, "home")
+    return tmp_path / "home"
+
+
+def test_relative_override_is_made_absolute(relative_home: Path) -> None:
+    home = paths.get_home_override_dir()
+    assert home is not None and home.is_absolute()
+    assert home == relative_home.resolve()
+    for get_path, _ in DATA_PATHS + STATE_PATHS:
+        assert get_path().is_absolute()
+        assert get_path().is_relative_to(relative_home.resolve())
+
+
+def test_tilde_override_is_expanded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))  # Windows
+    monkeypatch.setenv(paths.HOME_ENV_VAR, str(Path("~") / "mkcd2app-home"))
+    assert paths.get_home_override_dir() == (tmp_path / "mkcd2app-home").resolve()

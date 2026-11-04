@@ -1,6 +1,7 @@
 import logging
 
 from redun import task
+from redun.task import CacheScope
 
 from mkcd2app.utils.filesystem import rmtree_robust
 from mkcd2app.utils.logger import create_logger
@@ -9,7 +10,9 @@ from mkcd2app.utils.paths import get_toolchain_dir
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-@task(namespace="mkcd2app")
+# Never cached: it returns None, so a cached result can't tell that the directory
+#  was reinstalled since, and a second uninstall would silently do nothing
+@task(namespace="mkcd2app", cache_scope=CacheScope.NONE)
 def uninstall_toolchain() -> None:
     """
     Uninstall the toolchain for this mkcd2app version by removing the toolchain

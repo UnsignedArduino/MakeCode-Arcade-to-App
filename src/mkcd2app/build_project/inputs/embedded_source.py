@@ -24,6 +24,13 @@ PNG_HEADER_SIZE = 36  # 9 x u32 LE: magic, blob_len, added_lines, 6 x reserved
 UF2_MAGIC0 = 0x0A324655
 UF2_MAGIC1 = 0x9E5D5157
 UF2_FLAG_NOT_MAIN_FLASH = 0x00000001
+UF2_BLOCK_SIZE = 512
+UF2_MAX_PAYLOAD = 476  # 512 - 32 byte header - 4 byte end magic
+# Blocks further apart than this start a new run instead of being zero-padded
+# (pxt's UF2.toBin skips blocks after a gap over 1 MB)
+UF2_MAX_GAP = 1024 * 1024
+# The flash images we read are a few MB; bounds the memory a crafted file can ask for
+UF2_MAX_IMAGE_SIZE = 64 * 1024 * 1024
 SOURCE_MAGIC = bytes([0x41, 0x14, 0x0E, 0x2F, 0xB8, 0x2F, 0xA2, 0xBB])
 
 ZIP_MAGIC = b"PK\x03\x04"
@@ -45,9 +52,34 @@ def _parse_files(text: str | bytes) -> dict[str, str]:
     return files
 
 
-def _lzma_decompress(buf: bytes) -> str:
+def _cesu8_to_utf16(buf: bytes) -> bytes:
+    """
+    Decode text written by LZMA-JS's string encoder to UTF-16-LE code units.
+
+    LZMA-JS encodes each UTF-16 code unit on its own (CESU-8): characters outside
+    the BMP, like emoji, become two 3-byte surrogates that strict UTF-8 rejects, and
+    U+0000 becomes C0 80. Plain UTF-8 (including 4-byte sequences) decodes the same.
+    Returning code units keeps JavaScript string offsets (e.g. UF2 ``headerSize``)
+    valid as ``2 * offset``.
+    """
+    # C0 is never valid UTF-8, so this can't touch anything else
+    text = buf.replace(b"\xc0\x80", b"\x00").decode("utf-8", "surrogatepass")
+    return text.encode("utf-16-le", "surrogatepass")
+
+
+def _utf16_to_str(units: bytes) -> str:
+    """
+    Turn UTF-16-LE code units into a str, joining surrogate pairs.
+
+    :raises UnicodeDecodeError: On a lone surrogate, which can't be written as UTF-8.
+    """
+    return units.decode("utf-16-le")
+
+
+def _lzma_decompress(buf: bytes) -> bytes:
+    """Decompress an LZMA-JS payload to its text, as UTF-16-LE code units."""
     # pxt uses LZMA-JS, which writes the legacy ".lzma" (LZMA_Alone) container.
-    return lzma.decompress(buf, format=lzma.FORMAT_ALONE).decode("utf-8")
+    return _cesu8_to_utf16(lzma.decompress(buf, format=lzma.FORMAT_ALONE))
 
 
 # ---------------------------------------------------------------- PNG ---------
@@ -97,7 +129,7 @@ def _png_blob(path: Path) -> bytes:
 
 
 def files_from_png(path: Path) -> dict[str, str]:
-    project = json.loads(_lzma_decompress(_png_blob(path)))
+    project = json.loads(_utf16_to_str(_lzma_decompress(_png_blob(path))))
     # {"meta": {...name, cloudId, targetVersions, editor}, "source": "<json of files>"}
     if not isinstance(project, dict) or not isinstance(project.get("source"), str):
         raise EmbeddedSourceError("Embedded PNG project has no source")
@@ -107,49 +139,95 @@ def files_from_png(path: Path) -> dict[str, str]:
 # ---------------------------------------------------------------- UF2 ---------
 
 
-def _uf2_to_bin(data: bytes) -> bytes:
+def _uf2_runs(data: bytes) -> list[tuple[int, bytes]]:
+    """
+    Reassemble a UF2's main-flash blocks into contiguous runs of memory.
+
+    Blocks with small gaps between them are zero-padded into one run, like pxt's
+    ``UF2.toBin``; a bigger gap starts a new run, so far-apart addresses never turn
+    into one huge buffer. Everything is validated before anything is allocated.
+
+    :return: (offset from the lowest address, bytes) for each run, in address order.
+    :raises EmbeddedSourceError: If there are no blocks, a block's payload doesn't fit
+     in it, or the runs add up to more than ``UF2_MAX_IMAGE_SIZE``.
+    """
     chunks: dict[int, bytes] = {}
-    for off in range(0, len(data) - 511, 512):
+    for off in range(0, len(data) - UF2_BLOCK_SIZE + 1, UF2_BLOCK_SIZE):
         m0, m1, flags, addr, size = struct.unpack_from("<5I", data, off)
         if m0 != UF2_MAGIC0 or m1 != UF2_MAGIC1 or flags & UF2_FLAG_NOT_MAIN_FLASH:
             continue
+        if size > UF2_MAX_PAYLOAD:
+            raise EmbeddedSourceError(
+                f"UF2 block at offset {off} declares a {size} byte payload, "
+                f"over the {UF2_MAX_PAYLOAD} bytes a block can hold"
+            )
         chunks[addr] = data[off + 32 : off + 32 + size]
     if not chunks:
         raise EmbeddedSourceError("Not a UF2 file")
-    base = min(chunks)
-    end = max(a + len(c) for a, c in chunks.items())
-    buf = bytearray(end - base)
-    for addr, c in chunks.items():
-        buf[addr - base : addr - base + len(c)] = c
-    return bytes(buf)
+
+    # Lay out the runs as (start, end, [(addr, chunk)]) before allocating
+    spans: list[tuple[int, int, list[tuple[int, bytes]]]] = []
+    for addr in sorted(chunks):
+        chunk = chunks[addr]
+        if spans and addr - spans[-1][1] <= UF2_MAX_GAP:
+            start, end, members = spans[-1]
+            members.append((addr, chunk))
+            spans[-1] = (start, max(end, addr + len(chunk)), members)
+        else:
+            spans.append((addr, addr + len(chunk), [(addr, chunk)]))
+    total = sum(end - start for start, end, _ in spans)
+    if total > UF2_MAX_IMAGE_SIZE:
+        raise EmbeddedSourceError(
+            f"UF2 covers {total} bytes of memory, "
+            f"over the {UF2_MAX_IMAGE_SIZE // 2**20} MB limit"
+        )
+
+    base = spans[0][0]
+    runs: list[tuple[int, bytes]] = []
+    for start, end, members in spans:
+        buf = bytearray(end - start)
+        for addr, chunk in members:
+            buf[addr - start : addr - start + len(chunk)] = chunk
+        runs.append((start - base, bytes(buf)))
+    return runs
+
+
+def _find_source(runs: list[tuple[int, bytes]]) -> tuple[bytes, int]:
+    """
+    Find the 16-byte aligned source magic (alignment counted from the lowest
+    address, like pxt's search over the whole image).
+
+    :return: The run holding it and the magic's position in that run.
+    """
+    for run_offset, run in runs:
+        p = 0
+        while (p := run.find(SOURCE_MAGIC, p)) >= 0:
+            if (run_offset + p) % 16 == 0:
+                return run, p
+            p += 1
+    raise EmbeddedSourceError("This UF2 doesn't contain source (binary-only build?)")
 
 
 def files_from_uf2(path: Path) -> dict[str, str]:
-    bin_ = _uf2_to_bin(path.read_bytes())
-    p = 0
-    while True:
-        p = bin_.find(SOURCE_MAGIC, p)
-        if p < 0:
-            raise EmbeddedSourceError(
-                "This UF2 doesn't contain source (binary-only build?)"
-            )
-        if p % 16 == 0:  # pxt only looks at 16-byte aligned positions
-            break
-        p += 1
+    bin_, p = _find_source(_uf2_runs(path.read_bytes()))
     meta_len, text_len = struct.unpack_from("<HI", bin_, p + 8)
     p += 16
-    meta = json.loads(bin_[p : p + meta_len].decode("utf-8"))
+    meta = json.loads(_utf16_to_str(_cesu8_to_utf16(bin_[p : p + meta_len])))
     if not isinstance(meta, dict):
         raise EmbeddedSourceError("UF2 source metadata is not a JSON object")
     text = bin_[p + meta_len : p + meta_len + text_len]
 
     if meta.get("compression") == "LZMA":
-        raw = _lzma_decompress(text)
+        units = _lzma_decompress(text)
+        # headerSize is a JavaScript string length, i.e. in UTF-16 code units
         header_size = meta.get("headerSize") or meta.get("metaSize") or 0
-        return _parse_files(raw[header_size:])  # header JSON, then files JSON
+        if not isinstance(header_size, int) or not 0 <= 2 * header_size <= len(units):
+            raise EmbeddedSourceError(f"Invalid UF2 source headerSize {header_size!r}")
+        # header JSON, then files JSON
+        return _parse_files(_utf16_to_str(units[2 * header_size :]))
     if meta.get("compression"):
         raise EmbeddedSourceError(f"Unsupported compression {meta['compression']}")
-    return _parse_files(text.decode("utf-8"))
+    return _parse_files(_utf16_to_str(_cesu8_to_utf16(text)))
 
 
 # ---------------------------------------------------------------- ZIP ---------

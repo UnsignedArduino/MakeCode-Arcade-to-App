@@ -3,6 +3,7 @@ from pathlib import Path
 
 import redun
 from redun import Scheduler
+from redun.backends.db import RedunBackendDb
 from redun.expression import Expression, Result
 
 from mkcd2app.utils.logger import create_logger
@@ -23,4 +24,14 @@ def run_redun_task(expr: Expression[Result] | Result, redun_db_path: Path) -> Re
     )
     scheduler = Scheduler(config=redun_config)
     scheduler.load()
-    return scheduler.run(expr)
+    try:
+        return scheduler.run(expr)
+    finally:
+        # Close the SQLite connections, so a process that runs several commands
+        #  (like the tests) doesn't leak one per run
+        backend = scheduler.backend
+        if isinstance(backend, RedunBackendDb):
+            if backend.session is not None:
+                backend.session.close()
+            if backend.engine is not None:
+                backend.engine.dispose()

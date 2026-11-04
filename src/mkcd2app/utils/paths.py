@@ -17,8 +17,14 @@ HOME_ENV_VAR = "MKCD2APP_HOME"
 
 
 def get_home_override_dir() -> Path | None:
+    """
+    The ``MKCD2APP_HOME`` override, made absolute (with ``~`` expanded).
+
+    Relative paths would break subprocesses: they run in other directories, so a
+    relative executable or ``--cache`` path would point somewhere else.
+    """
     home = os.environ.get(HOME_ENV_VAR)
-    return Path(home) if home else None
+    return Path(home).expanduser().resolve() if home else None
 
 
 def get_user_data_dir() -> Path:
