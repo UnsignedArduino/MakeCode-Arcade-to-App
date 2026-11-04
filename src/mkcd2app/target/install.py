@@ -4,6 +4,7 @@ import shutil
 from contextlib import ExitStack
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -97,8 +98,9 @@ def download_sim(bin_js_metadata: str, version: str) -> ContentFile:
         f"Downloading simulator for MakeCode Arcade version {metadata.targetVersion}"
     )
 
-    logger.debug(f"Downloading main simulator file from {metadata.simUrl}")
-    sim_html = _download_text(str(metadata.simUrl))
+    sim_url = str(metadata.simUrl)
+    logger.debug(f"Downloading main simulator file from {sim_url}")
+    sim_html = _download_text(sim_url)
 
     logger.debug(
         f"Analyzing sim HTML ({len(sim_html)} chars) for required CSS and JS files"
@@ -112,14 +114,14 @@ def download_sim(bin_js_metadata: str, version: str) -> ContentFile:
         if url:
             logger.debug(f"Downloading CSS file {url}")
             style_tag = soup.new_tag("style")
-            style_tag.string = _download_text(str(url))
+            style_tag.string = _download_text(urljoin(sim_url, str(url)))
             css.replace_with(style_tag)
             logger.debug(f"Inlined CSS from {url}")
     for js in js_scripts:
         url = js.get("src")
         if url:
             logger.debug(f"Downloading JS file {url}")
-            js.string = _download_text(str(url))
+            js.string = _download_text(urljoin(sim_url, str(url)))
             del js["src"]
             logger.debug(f"Inlined JS from {url}")
     new_sim_html = soup.prettify(formatter="html5")

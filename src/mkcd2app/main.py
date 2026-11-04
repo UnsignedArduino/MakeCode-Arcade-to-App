@@ -1,16 +1,17 @@
 import logging
-import shutil
 from pathlib import Path
 
 from mkcd2app.build_project import BuildProjectResult, build_project
 from mkcd2app.cli import generate_and_parse_args
-from mkcd2app.config import load_config_from_yaml
+from mkcd2app.config import load_config_from_yaml, resolve_config_paths
 from mkcd2app.target.install import install_target
 from mkcd2app.target.uninstall import uninstall_target
 from mkcd2app.toolchain.install import install_toolchain
 from mkcd2app.toolchain.uninstall import uninstall_toolchain
+from mkcd2app.utils.filesystem import rmtree_robust
 from mkcd2app.utils.logger import create_logger, set_all_stdout_logger_levels
 from mkcd2app.utils.paths import (
+    get_redun_db_for_build_path,
     get_redun_db_for_target_path,
     get_redun_db_for_toolchain_path,
 )
@@ -18,6 +19,29 @@ from mkcd2app.utils.run_redun_task import run_redun_task
 from mkcd2app.utils.text import raise_for_invalid_strict_semver
 
 logger = create_logger(name=__name__, level=logging.INFO)
+
+
+def _clear_build_dir(build_dir: Path) -> None:
+    """
+    Delete the build directory for a full rebuild.
+
+    Only a directory with our cache DB is deleted, since `build_dir` comes from the
+    config and a mistake there could otherwise delete an unrelated directory.
+
+    :param build_dir: The build directory.
+    :raises RuntimeError: If the directory has other files but no cache DB.
+    """
+    if not build_dir.exists() or not any(build_dir.iterdir()):
+        logger.debug("Build directory is missing or empty; nothing to clear")
+        return
+    redun_db_path = get_redun_db_for_build_path(build_dir)
+    if not redun_db_path.exists():
+        raise RuntimeError(
+            f"Refusing to clear {build_dir}: it isn't empty and has no "
+            f"{redun_db_path.name}, so it may not be a build directory"
+        )
+    logger.warning(f"Clearing build directory {build_dir}")
+    rmtree_robust(build_dir)
 
 
 def main() -> None:
@@ -78,22 +102,21 @@ def main() -> None:
 
         config_text = config_path.read_text(encoding="utf-8")
 
-        # Parse once only to extract build_dir for the redun DB path.
-        # The raw YAML text is passed to redun tasks so that argument
-        # hashing is deterministic (string) rather than pickle-based
-        # (which is non-deterministic due to pydantic's set fields).
-        config = load_config_from_yaml(config_text)
+        config = resolve_config_paths(
+            load_config_from_yaml(config_text), config_path.resolve().parent
+        )
         build_dir = Path(config.build_dir)
 
         if args.full_rebuild:
-            if build_dir.exists():
-                logger.warning(f"Clearing build directory {build_dir}")
-                shutil.rmtree(build_dir)
-            else:
-                logger.debug("Build directory does not exist; nothing to clear")
+            _clear_build_dir(build_dir)
 
+        # The config is passed to redun tasks as JSON so that argument hashing is
+        # deterministic (string) rather than pickle-based (which is non-deterministic
+        # due to pydantic's set fields), and so that YAML comments and formatting
+        # aren't part of the hash.
         results: BuildProjectResult = run_redun_task(
-            build_project(config_text), build_dir.resolve() / ".redun-cache.db"
+            build_project(config.model_dump_json()),
+            get_redun_db_for_build_path(build_dir),
         )
 
         if results.static:

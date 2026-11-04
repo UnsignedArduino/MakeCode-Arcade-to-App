@@ -79,3 +79,10 @@ def get_target_version_dir(v: str) -> Path:
 
 def get_sim_html_path(v: str) -> Path:
     return get_target_version_dir(v) / "---simulator.html"
+
+
+# Build stuff
+
+
+def get_redun_db_for_build_path(build_dir: Path) -> Path:
+    return build_dir / ".redun-cache.db"

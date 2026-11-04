@@ -9,7 +9,6 @@ from pathlib import Path
 from redun import task
 from redun.file import ContentDir, ContentFile
 
-from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import Project
 from mkcd2app.utils.logger import create_logger
 from mkcd2app.utils.paths import get_templates_npm_cache_dir
@@ -96,20 +95,19 @@ def _website_dir(build_dir: Path, name: str, suffix: str) -> Path:
 
 
 @task(namespace="mkcd2app")
-def copy_website_template(config_yaml: str, template_src: ContentDir) -> ContentDir:
+def copy_website_template(website_dir: str, template_src: ContentDir) -> ContentDir:
     """
     Copy the template to the build directory.
 
-    Example input: config_yaml, template_src
+    Example input: racers-website, template_src
     Example output: racers-website
 
-    :param config_yaml: The raw YAML text of the config file.
+    :param website_dir: The directory to copy the template to.
     :param template_src: A redun.ContentDir pointing to the template source,
                          so that redun tracks changes to template files.
     :return: A redun.ContentDir that points to the Vite website template directory.
     """
-    config = load_config_from_yaml(config_yaml)
-    dst = _website_dir(Path(config.build_dir), config.project.path_friendly_name, "")
+    dst = Path(website_dir)
     logger.info(f"Website will be copied to {dst}")
     if dst.exists():
         shutil.rmtree(dst)
@@ -121,7 +119,7 @@ def copy_website_template(config_yaml: str, template_src: ContentDir) -> Content
 
 @task(namespace="mkcd2app")
 def fill_website_template(
-    config_yaml: str,
+    project_json: str,
     website_path: ContentDir,
     bin_js_path: ContentFile,
     support_path: ContentDir,
@@ -132,7 +130,7 @@ def fill_website_template(
     Example intput: racers-website
     Example output: racers-website-filled
 
-    :param config_yaml: The raw YAML text of the config file.
+    :param project_json: The config's Project dumped to a JSON string.
     :param website_path: redun.ContentDir pointing to the copied website template.
     :param bin_js_path: redun.ContentFile pointing to the binary JS file.
     :param support_path: redun.ContentDir pointing to the support file directory.
@@ -140,7 +138,7 @@ def fill_website_template(
     """
     logger.info("Filling website template")
 
-    config = load_config_from_yaml(config_yaml)
+    project = Project.model_validate_json(project_json)
     src = Path(website_path.path)
     dst = src.parent / f"{src.name}-filled"
     if dst.exists():
@@ -159,7 +157,7 @@ def fill_website_template(
     logger.debug(f"Copying ---simulator.html from {simulator_html_path}")
     shutil.copy(simulator_html_path, asset_path)
 
-    title = render_title(config.project)
+    title = render_title(project)
     logger.debug(f'Using title "{title}" in index.html')
     favicon_path = Path(support_path.path) / "favicon.ico"
     favicon = favicon_path.read_bytes() if favicon_path.exists() else None
@@ -174,10 +172,10 @@ def fill_website_template(
     logger.debug("Updating package.json")
     package_json_path = dst / "package.json"
     package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
-    package_json["name"] = config.project.path_friendly_name
-    package_json["version"] = config.project.version
-    package_json["description"] = config.project.description
-    package_json["authors"] = {"name": config.project.author}
+    package_json["name"] = project.path_friendly_name
+    package_json["version"] = project.version
+    package_json["description"] = project.description
+    package_json["authors"] = {"name": project.author}
     package_json_path.write_text(json.dumps(package_json, indent=2), encoding="utf-8")
 
     logger.debug("Website template filled")

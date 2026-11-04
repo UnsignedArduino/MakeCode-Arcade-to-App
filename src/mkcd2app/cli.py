@@ -6,10 +6,11 @@ from mkcd2app.utils.logger import create_logger
 logger = create_logger(name=__name__, level=logging.INFO)
 
 
-def generate_and_parse_args() -> Namespace:
+def generate_and_parse_args(argv: list[str] | None = None) -> Namespace:
     """
     Parse this CLI tool's arguments.
 
+    :param argv: The arguments to parse. Defaults to `sys.argv[1:]`.
     :return: A `Namespace` object with parsed CLI arguments.
     """
     parser = ArgumentParser(
@@ -27,13 +28,19 @@ def generate_and_parse_args() -> Namespace:
     parser_build = subparsers.add_parser(
         "build", help="Build your MakeCode Arcade game."
     )
-    parser_build.add_argument("config", type=str, help="Path to the YAML config file.")
+    parser_build.add_argument(
+        "config",
+        type=str,
+        help="Path to the YAML config file. Relative paths in it are relative to the "
+        "file's directory.",
+    )
     parser_build.add_argument(
         "--full-rebuild",
         action="store_true",
         help="Delete the build directory and its cache, then rebuild everything. Use "
         "this after changing the game's source files, icon, or git branch, since "
-        "only changes to the config file are detected automatically.",
+        "only changes to the config file are detected automatically. Refuses to "
+        "delete a non-empty directory that has no build cache in it.",
     )
 
     parser_toolchain = subparsers.add_parser(
@@ -76,6 +83,6 @@ def generate_and_parse_args() -> Namespace:
         "version", type=str, help="Target version to uninstall."
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logger.debug(f"Received arguments: {args}")
     return args

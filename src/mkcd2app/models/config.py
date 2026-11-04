@@ -1,19 +1,37 @@
 from typing import Annotated, Literal
 
-from pydantic import AnyUrl, BaseModel, Field, HttpUrl, RootModel, field_validator
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    RootModel,
+    field_validator,
+)
 
 from mkcd2app.utils.text import raise_for_invalid_strict_semver
+
+
+class ConfigModel(BaseModel):
+    """
+    Base for the config's models. Unknown keys are errors, so that a typo like
+    ``titel:`` fails instead of silently using the default.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
 
 # Source code can be a share link, git repo, a path on disk, or a file: a PNG/UF2
 # downloaded from the editor with the project embedded, or a ZIP of the project
 
 
-class ShareLinkCodeSource(BaseModel):
+class ShareLinkCodeSource(ConfigModel):
     type: Literal["share_link"]
     value: HttpUrl
 
 
-class GitCodeSource(BaseModel):
+class GitCodeSource(ConfigModel):
     type: Literal["git"]
     # Any URL dulwich can clone: https://, http://, git://, file://, or ssh:// (ssh://
     # needs an `ssh` executable on PATH)
@@ -23,7 +41,7 @@ class GitCodeSource(BaseModel):
     ref: str | None = None
 
 
-class GitHubCodeSource(BaseModel):
+class GitHubCodeSource(ConfigModel):
     """
     Alias for GitCodeSource, kept so older configs keep working: `value` is the
     URL and `checkout` is the ref.
@@ -34,12 +52,12 @@ class GitHubCodeSource(BaseModel):
     checkout: str = "master"
 
 
-class PathCodeSource(BaseModel):
+class PathCodeSource(ConfigModel):
     type: Literal["path"]
     value: str
 
 
-class FileCodeSource(BaseModel):
+class FileCodeSource(ConfigModel):
     """
     A PNG or UF2 downloaded from the MakeCode editor with the project embedded, or a
     ZIP of the project (e.g. GitHub's "Download ZIP"). Detected by content.
@@ -64,12 +82,12 @@ CodeSource = RootModel[
 # Assets can be a URL or path on disk
 
 
-class UrlAssetSource(BaseModel):
+class UrlAssetSource(ConfigModel):
     type: Literal["url"]
     value: HttpUrl
 
 
-class PathAssetSource(BaseModel):
+class PathAssetSource(ConfigModel):
     type: Literal["path"]
     value: str
 
@@ -80,18 +98,18 @@ AssetSource = RootModel[
 
 
 # Right now we only have one asset so far, just the icon
-class Assets(BaseModel):
+class Assets(ConfigModel):
     icon: AssetSource | None = None
 
 
 # To build a project, we need multiple inputs
-class Inputs(BaseModel):
+class Inputs(ConfigModel):
     code: CodeSource
     assets: Assets
 
 
 # Project metadata
-class Project(BaseModel):
+class Project(ConfigModel):
     """
     ``title`` is the window/page title. The placeholders ``{NAME}``, ``{VERSION}``
     and ``{AUTHOR}`` are replaced with the matching fields, in a single pass (so a
@@ -108,7 +126,7 @@ class Project(BaseModel):
     title: str = "{NAME} v{VERSION}"
 
 
-class WindowConfig(BaseModel):
+class WindowConfig(ConfigModel):
     width: int = 640
     height: int = 480
 
@@ -116,20 +134,20 @@ class WindowConfig(BaseModel):
 # Different types of outputs available that we can build
 
 
-class StaticOutput(BaseModel):
+class StaticOutput(ConfigModel):
     type: Literal["static"]
 
 
-class StaticSinglefileOutput(BaseModel):
+class StaticSinglefileOutput(ConfigModel):
     type: Literal["static-singlefile"]
 
 
-class ElectronOutput(BaseModel):
+class ElectronOutput(ConfigModel):
     type: Literal["electron"]
     window: WindowConfig | None = None
 
 
-class TauriOutput(BaseModel):
+class TauriOutput(ConfigModel):
     type: Literal["tauri"]
     identifier: str
     window: WindowConfig | None = None
@@ -144,19 +162,18 @@ OutputOption = RootModel[
 
 
 # The entire config
-class BuildConfig(BaseModel):
+class BuildConfig(ConfigModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     version: int  # currently only 1 version so far
     project: Project
     inputs: Inputs
     build_dir: str = Field(..., alias="build_dir")
     target: str = Field(..., alias="target")
-    outputs: list[OutputOption]
+    outputs: list[OutputOption] = Field(..., min_length=1)
 
     @field_validator("target")
     @classmethod
     def _check_target_is_strict_semver(cls, v: str) -> str:
         raise_for_invalid_strict_semver(v)
         return v
-
-    class Config:
-        populate_by_name = True

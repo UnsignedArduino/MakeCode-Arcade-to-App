@@ -34,7 +34,8 @@ inputs:
       value: "E:/Racers/Racers icon.png"
 
 # Path where the build process will take place
-build_dir: "./examples/Racers-offline-build"
+# Relative paths in this file are relative to this file's directory
+build_dir: "./Racers-offline-build"
 
 # The MakeCode Arcade version to target
 # Must be explicit 3 number sem ver, do not add a "v" at the beginning

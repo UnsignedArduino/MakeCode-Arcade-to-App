@@ -10,8 +10,9 @@ from redun import task
 from redun.file import ContentDir, ContentFile
 
 from mkcd2app.build_project.inputs.embedded_source import extract_project
-from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import (
+    AssetSource,
+    CodeSource,
     FileCodeSource,
     GitCodeSource,
     GitHubCodeSource,
@@ -44,18 +45,19 @@ def _warn_on_target_mismatch(pxt_json_path: Path, target: str) -> None:
 
 
 @task(namespace="mkcd2app")
-def fetch_code(config_yaml: str) -> ContentDir:
+def fetch_code(code_source_json: str, target: str, code_dir: str) -> ContentDir:
     """
     Download/clone/copy the source code to the build directory.
 
-    Example input: config_yaml, ./node_modules
+    Example input: code_source_json, 4.0.14, ./racers-source
     Example output: ./racers-source
 
-    :param config_yaml: The raw YAML text of the config file.
+    :param code_source_json: The config's CodeSource dumped to a JSON string.
+    :param target: The MakeCode Arcade version to target. E.g., "4.0.14".
+    :param code_dir: The directory to put the source code in.
     :return: A redun.ContentDir that points to the source code.
     """
-    config = load_config_from_yaml(config_yaml)
-    code_path = Path(config.build_dir) / f"{config.project.path_friendly_name}-source"
+    code_path = Path(code_dir)
     logger.info(f"MakeCode Arcade source will be downloaded/copied to {code_path}")
 
     # Clean previous output, not wasteful because redun already checks our inputs
@@ -63,7 +65,7 @@ def fetch_code(config_yaml: str) -> ContentDir:
     if code_path.exists():
         rmtree_robust(code_path)
 
-    match config.inputs.code.root:
+    match CodeSource.model_validate_json(code_source_json).root:
         case ShareLinkCodeSource(value=url):
             logger.debug(f"Downloading source code from {url} with `mkc` CLI")
             code_path.mkdir(parents=True)
@@ -89,12 +91,11 @@ def fetch_code(config_yaml: str) -> ContentDir:
             # Raises EmbeddedSourceError (with the file path) if there's no project
             files = extract_project(src_file, code_path)
             logger.debug(f"Extracted {len(files)} files: {', '.join(files)}")
-            _warn_on_target_mismatch(code_path / "pxt.json", config.target)
+            _warn_on_target_mismatch(code_path / "pxt.json", target)
 
     mkc_json_path = code_path / "mkc.json"
     logger.debug("Writing mkc.json")
-    version = config.target
-    mkc_json = {"targetWebsite": f"https://arcade.makecode.com/v{version}"}
+    mkc_json = {"targetWebsite": f"https://arcade.makecode.com/v{target}"}
     mkc_json_path.write_text(json.dumps(mkc_json), encoding="utf-8")
 
     logger.debug("Source code downloaded")
@@ -102,22 +103,27 @@ def fetch_code(config_yaml: str) -> ContentDir:
 
 
 @task(namespace="mkcd2app")
-def build_binary_js(config_yaml: str, code_path: ContentDir) -> ContentFile:
+def build_binary_js(code_path: ContentDir, build_dir: str) -> ContentFile:
     """
-    Build the MakeCode Arcade binary.js file
+    Make a copy of the source code, then build the MakeCode Arcade binary.js file in it.
 
-    Example input: config_yaml, ./racers-source
-    Example output: ./racers-binary-js/binary.js
+    We copy so that we never mutate the ContentDir that fetch_code owns.
 
-    :param config_yaml: The raw YAML text of the config file.
+    Example input: ./racers-source, ./racers-binary-js-build
+    Example output: ./racers-binary-js-build/built/binary.js
+
     :param code_path: A redun.ContentDir where the code is stored.
+    :param build_dir: The directory to copy the source code to and build in.
     :return: A redun.ContentFile that points to binary.js
     """
-    config = load_config_from_yaml(config_yaml)
-
     logger.info("Building MakeCode Arcade binary.js")
 
-    cwd = Path(code_path.path)
+    cwd = Path(build_dir)
+    # Robust because a git code source's copy has a .git directory
+    if cwd.exists():
+        rmtree_robust(cwd)
+    shutil.copytree(code_path.path, cwd)
+
     logger.debug(f"Building in cwd {cwd}")
     run_cmd(
         ["mkc", "build", "-j"],
@@ -128,36 +134,27 @@ def build_binary_js(config_yaml: str, code_path: ContentDir) -> ContentFile:
     bin_js_path = cwd / "built" / "binary.js"
     logger.debug(f"binary.js available at {bin_js_path}")
 
-    # Copy binary to a stable location outside code_dir so we don't
-    # pollute fetch_code's ContentDir hash on subsequent runs.
-    output_path = (
-        cwd.parent / f"{config.project.path_friendly_name}-binary-js" / "binary.js"
-    )
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(bin_js_path, output_path)
-    shutil.rmtree(cwd / "built")
-
-    return ContentFile(str(output_path))
+    return ContentFile(str(bin_js_path))
 
 
 @task(namespace="mkcd2app")
-def copy_support_files(config_yaml: str) -> ContentDir:
+def copy_support_files(
+    target: str, icon_source_json: str | None, support_dir: str
+) -> ContentDir:
     """
     Download and modify all supporting files needed to run binary.js for the website
 
-    Example input: config_yaml
+    Example input: 4.0.14, icon_source_json, ./racers-binary-js-support
     Example output: ./racers-binary-js-support
 
-    :param config_yaml: The raw YAML text of the config file.
+    :param target: The MakeCode Arcade version to target. E.g., "4.0.14".
+    :param icon_source_json: The config's icon AssetSource dumped to a JSON string, or
+     None if there is no icon.
+    :param support_dir: The directory to put the files in.
     :return: redun.ContentDir that points to a directory of files that should be copied
      to the website's public folder as is alongside the binary.js file.
     """
-    config = load_config_from_yaml(config_yaml)
-    support_path = (
-        Path(config.build_dir)
-        / f"{config.project.path_friendly_name}-binary-js-support"
-    )
-    target = config.target
+    support_path = Path(support_dir)
     logger.info(
         f"Copying ---simulator.html for MakeCode Arcade {target} to {support_path}"
     )
@@ -169,8 +166,8 @@ def copy_support_files(config_yaml: str) -> ContentDir:
     # Only one file to copy
     shutil.copy(get_sim_html_path(target), support_path)
 
-    if config.inputs.assets.icon:
-        match config.inputs.assets.icon.root:
+    if icon_source_json is not None:
+        match AssetSource.model_validate_json(icon_source_json).root:
             case UrlAssetSource(value=icon_url):
                 logger.debug(f"Downloading icon from {icon_url}")
                 res = requests.get(str(icon_url))

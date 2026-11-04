@@ -2,6 +2,7 @@ import logging
 from contextlib import ExitStack
 from dataclasses import dataclass
 from pathlib import Path
+from typing import assert_never
 
 from redun import task
 from redun.file import ContentDir, ContentFile
@@ -19,9 +20,15 @@ from mkcd2app.build_project.website import (
     fill_website_template,
     install_website_deps,
 )
-from mkcd2app.config import load_config_from_yaml
-from mkcd2app.models.config import StaticOutput, StaticSinglefileOutput
+from mkcd2app.models.config import (
+    BuildConfig,
+    ElectronOutput,
+    StaticOutput,
+    StaticSinglefileOutput,
+    TauriOutput,
+)
 from mkcd2app.utils.logger import create_logger
+from mkcd2app.utils.paths import get_sim_html_path
 from mkcd2app.utils.resources import get_resource_template_path
 
 logger = create_logger(name=__name__, level=logging.INFO)
@@ -36,41 +43,66 @@ class BuildProjectResult:
 
 
 @task(namespace="mkcd2app")
-def build_project(config_yaml: str) -> BuildProjectResult:
+def build_project(config_json: str) -> BuildProjectResult:
     """
     Build the project.
 
-    :param config_yaml: The raw YAML text of the config file.
+    Each subtask gets only the parts of the config it uses, as strings, so editing
+    one part of the config only reruns the tasks that depend on it.
+
+    :param config_json: The BuildConfig, with absolute paths (see
+     `resolve_config_paths`), dumped to a JSON string.
     :return BuildProjectResult: A BuildProjectResult object containing paths.
     """
     logger.info("Building project")
 
-    config = load_config_from_yaml(config_yaml)
+    config = BuildConfig.model_validate_json(config_json)
     build_dir = Path(config.build_dir)
+    name = config.project.path_friendly_name
     logger.debug(f"Project build directory is at {build_dir}")
     build_dir.mkdir(parents=True, exist_ok=True)
+
+    if not get_sim_html_path(config.target).is_file():
+        raise FileNotFoundError(
+            f"MakeCode Arcade target {config.target} is not installed, install it "
+            f"with `mkcd2app target install {config.target}`"
+        )
+
+    icon = config.inputs.assets.icon
 
     with ExitStack() as stack:
         template_path = stack.enter_context(get_resource_template_path("vite-project"))
         template_content = ContentDir(str(template_path))
 
         # Fetch game source code with `mkc`, dulwich (git), or copy from disk
-        code_path = fetch_code(config_yaml)
-        # Build binary.js with `mkc`
-        bin_js_path = build_binary_js(config_yaml, code_path)
+        code_path = fetch_code(
+            config.inputs.code.model_dump_json(),
+            config.target,
+            str(build_dir / f"{name}-source"),
+        )
+        # Copy the source code + build binary.js with `mkc`
+        bin_js_path = build_binary_js(
+            code_path, str(build_dir / f"{name}-binary-js-build")
+        )
         # Copy ---simulator.html from target dir and get favicon.ico if present
-        support_path = copy_support_files(config_yaml)
+        support_path = copy_support_files(
+            config.target,
+            icon.model_dump_json() if icon else None,
+            str(build_dir / f"{name}-binary-js-support"),
+        )
         # Copy website template (clean copy with template files only)
-        website_path = copy_website_template(config_yaml, template_content)
+        website_path = copy_website_template(
+            str(_website_dir(build_dir, name, "")), template_content
+        )
         # Copy + fill (separate dir so stages don't mutate each other's
         #  ContentDir/ContentPath
         website_filled_path = fill_website_template(
-            config_yaml, website_path, bin_js_path, support_path
+            config.project.model_dump_json(), website_path, bin_js_path, support_path
         )
         # `npm ci` from only package.json + lockfile, so game/asset changes don't
         #  bust it; shared by every website output
         node_modules = install_website_deps(
-            str(_website_dir(build_dir, config.project.path_friendly_name, "-deps")),
+            str(_website_dir(build_dir, name, "-deps")),
             ContentFile(str(template_path / "package.json")),
             ContentFile(str(template_path / "package-lock.json")),
         )
@@ -91,5 +123,12 @@ def build_project(config_yaml: str) -> BuildProjectResult:
                         website_filled_path, node_modules
                     )
                     logger.debug("Will build to static single-file website")
+                case ElectronOutput() | TauriOutput():
+                    # Tasks are lazy, so nothing has run yet
+                    raise NotImplementedError(
+                        f"The {output.root.type} output is not implemented yet"
+                    )
+                case _:
+                    assert_never(output.root)
 
         return results
