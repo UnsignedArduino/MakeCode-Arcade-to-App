@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 from helpers import CmdCall, FakeRunCmd, make_config_yaml, tree_digest
@@ -11,12 +12,17 @@ from redun.file import ContentDir, ContentFile
 
 from mkcd2app.build_project import website
 from mkcd2app.build_project.website import (
+    INDEX_HTML_FAVICON_MARKER,
+    INDEX_HTML_TITLE_MARKER,
     build_website,
     build_website_singlefile,
     copy_website_template,
+    fill_index_html,
     fill_website_template,
     install_website_deps,
+    render_title,
 )
+from mkcd2app.models.config import Project
 from mkcd2app.utils.paths import get_templates_npm_cache_dir
 from mkcd2app.utils.resources import get_resource_template_path
 
@@ -51,12 +57,17 @@ def make_support_dir(tmp_path: Path, favicon: bytes | None = None) -> Path:
     return support
 
 
-def fill(tmp_path: Path, website_dir: Path, favicon: bytes | None = None) -> Path:
+def fill(
+    tmp_path: Path,
+    website_dir: Path,
+    favicon: bytes | None = None,
+    project: dict[str, Any] | None = None,
+) -> Path:
     bin_js = tmp_path / "build" / "test-binary-js" / "binary.js"
     bin_js.parent.mkdir(parents=True)
     bin_js.write_text(BINARY_JS, encoding="utf-8")
     result: ContentDir = fill_website_template.func(
-        make_config_yaml(tmp_path / "build"),
+        make_config_yaml(tmp_path / "build", project=project),
         ContentDir(str(website_dir)),
         ContentFile(str(bin_js)),
         ContentDir(str(make_support_dir(tmp_path, favicon))),
@@ -145,6 +156,138 @@ def test_fill_replaces_previous_output(tmp_path: Path, website_dir: Path) -> Non
     stale.write_text("old", encoding="utf-8")
     fill(tmp_path, website_dir)
     assert not stale.exists()
+
+
+def test_fill_escapes_title(tmp_path: Path, website_dir: Path) -> None:
+    filled = fill(tmp_path, website_dir, project={"name": "Tom & Jerry <3"})
+    index_html = (filled / "index.html").read_text("utf-8")
+    assert "<title>Tom &amp; Jerry &lt;3 v1.2.3</title>" in index_html
+
+
+def test_fill_title_with_braces_does_not_crash(
+    tmp_path: Path, website_dir: Path
+) -> None:
+    filled = fill(tmp_path, website_dir, project={"title": "My {Game} {NAME}"})
+    index_html = (filled / "index.html").read_text("utf-8")
+    assert "<title>My {Game} Test Game</title>" in index_html
+
+
+def test_fill_raises_on_template_without_title(
+    tmp_path: Path, website_dir: Path
+) -> None:
+    index_html = website_dir / "index.html"
+    text = index_html.read_text("utf-8")
+    assert INDEX_HTML_TITLE_MARKER in text
+    index_html.write_text(text.replace(INDEX_HTML_TITLE_MARKER, ""), "utf-8")
+    with pytest.raises(RuntimeError, match="vite-project"):
+        fill(tmp_path, website_dir)
+
+
+def test_fill_raises_on_template_without_favicon_link(
+    tmp_path: Path, website_dir: Path
+) -> None:
+    index_html = website_dir / "index.html"
+    text = index_html.read_text("utf-8")
+    index_html.write_text(text.replace(INDEX_HTML_FAVICON_MARKER, ""), "utf-8")
+    with pytest.raises(RuntimeError, match="favicon"):
+        fill(tmp_path, website_dir, b"icon")
+
+
+# ----------------------------------------------------------- render_title -----
+
+
+def make_project(**overrides: str) -> Project:
+    fields = {
+        "name": "Racers",
+        "path_friendly_name": "racers",
+        "author": "me",
+        "version": "1.0.0",
+        **overrides,
+    }
+    return Project.model_validate(fields)
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("{NAME} v{VERSION}", "Racers v1.0.0"),
+        ("{NAME} by {AUTHOR}", "Racers by me"),
+        ("{NAME}{NAME}", "RacersRacers"),
+        ("Plain title", "Plain title"),
+        # Anything that isn't one of the three placeholders is kept literally
+        ("My {Game}", "My {Game}"),
+        ("Score: {}", "Score: {}"),
+        ("{{NAME}}", "{Racers}"),
+        ("{NAME:>10}", "{NAME:>10}"),
+        ("{NAME.__class__}", "{NAME.__class__}"),
+        ("{name}", "{name}"),
+        ("{NAME", "{NAME"),
+    ],
+)
+def test_render_title(title: str, expected: str) -> None:
+    assert render_title(make_project(title=title)) == expected
+
+
+def test_render_title_default() -> None:
+    assert render_title(make_project()) == "Racers v1.0.0"
+
+
+def test_render_title_does_not_expand_substituted_values() -> None:
+    project = make_project(name="{VERSION}", author="{NAME}")
+    assert render_title(project.model_copy(update={"title": "{NAME} {AUTHOR}"})) == (
+        "{VERSION} {NAME}"
+    )
+
+
+def test_render_title_does_not_escape_html() -> None:
+    # Escaping is fill_index_html's job, after substitution
+    assert render_title(make_project(name="A & B")) == "A & B v1.0.0"
+
+
+# -------------------------------------------------------- fill_index_html -----
+
+MINIMAL_INDEX_HTML = (
+    f"<head>{INDEX_HTML_FAVICON_MARKER}{INDEX_HTML_TITLE_MARKER}</head>"
+)
+
+
+def test_fill_index_html_escapes_title() -> None:
+    out = fill_index_html(MINIMAL_INDEX_HTML, "</title><script>x</script>")
+    assert "<title>&lt;/title&gt;&lt;script&gt;x&lt;/script&gt;</title>" in out
+
+
+def test_fill_index_html_keeps_quotes_in_title() -> None:
+    out = fill_index_html(MINIMAL_INDEX_HTML, 'Say "hi"')
+    assert '<title>Say "hi"</title>' in out
+
+
+def test_fill_index_html_without_favicon_needs_no_link() -> None:
+    out = fill_index_html(INDEX_HTML_TITLE_MARKER, "T")
+    assert out == "<title>T</title>"
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["", INDEX_HTML_TITLE_MARKER * 2, "<title>Something else</title>"],
+    ids=["missing", "twice", "renamed"],
+)
+def test_fill_index_html_requires_title_marker_once(text: str) -> None:
+    with pytest.raises(RuntimeError, match="exactly once"):
+        fill_index_html(text, "T")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        INDEX_HTML_TITLE_MARKER,
+        INDEX_HTML_TITLE_MARKER + INDEX_HTML_FAVICON_MARKER * 2,
+        INDEX_HTML_TITLE_MARKER + '<link rel="icon" href="./favicon.ico">',
+    ],
+    ids=["missing", "twice", "reformatted"],
+)
+def test_fill_index_html_requires_favicon_marker_once(text: str) -> None:
+    with pytest.raises(RuntimeError, match="exactly once"):
+        fill_index_html(text, "T", b"icon")
 
 
 # -------------------------------------------------- install_website_deps ------

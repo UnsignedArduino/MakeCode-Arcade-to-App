@@ -234,4 +234,5 @@ configs; `fetch_code` handles both in one `case`.
   leaves other braces literal. The title is HTML-escaped into `index.html`, and
   `fill_index_html` raises if the template's `<title>`/favicon markers aren't each
   present exactly once, instead of silently shipping "vite-project" and no icon.
-  Unit tests for these are still to be written.
+  Covered by `tests/unit/test_semver.py` and the `render_title`/`fill_index_html`
+  tests in `tests/unit/test_website.py`.
