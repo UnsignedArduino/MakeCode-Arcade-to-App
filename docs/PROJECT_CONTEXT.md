@@ -143,11 +143,13 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
   build (and a title edit) works with Node's network blocked. Builds go in temp folders.
   The `share_link` test needs `--run-network`, so CI skips it. It takes about 7 minutes.
 - **CI** (`lint.yaml`, `unit.yaml`, `integration.yaml`, `e2e.yaml`) runs on pushes to
-  `main` and on PRs into any branch, so the stacked PRs get CI. Lint and all three e2e
-  jobs were green on PR #7 @ `d7ad64a`; the newer commits' CI results haven't been
-  checked. `unit.yaml` and `integration.yaml` run `pytest -m unit` and
+  `main` and on PRs into any branch, so the stacked PRs get CI. All four were green on
+  PR #7 @ `316dbc0`. `unit.yaml` and `integration.yaml` run `pytest -m unit` and
   `pytest -m integration` (no Node.js), and `e2e.yaml` runs `pytest -m e2e --no-cov`;
-  none waits for another.
+  none waits for another. On a PR, a tag in the last commit's message, like
+  `[skip-e2e-tests]` or `[no-unit]`, skips that tier, and `[skip-tests]` or `[no-tests]`
+  skips all three (`check-skip.yaml`, a reusable workflow each one calls). A skipped job
+  counts as passing. Pushes to `main` ignore these tags, so what's merged still gets tested.
 - `tests/integration` runs the real `main()` and redun scheduler in-process with
   `run_cmd` faked by `FakeToolchain` (`tests/helpers.py`), and takes about 2 minutes, as
   each build goes through redun. It covers the `build_project` wiring, the `CHANGES` table

@@ -1,0 +1,40 @@
+name: Check for a skip tag
+
+# Called by the test workflows, to skip their tier if the last commit of a PR says to:
+# [skip-<tier>-tests], [no-<tier>-tests], [skip-<tier>] or [no-<tier>], in any case, or
+# [skip-tests] or [no-tests] for every tier. Pushes to main always run everything, so
+# what's merged still gets tested.
+on:
+  workflow_call:
+    inputs:
+      tier:
+        description: The test tier to check for, like "unit"
+        required: true
+        type: string
+    outputs:
+      skip:
+        description: '"true" if this tier should be skipped'
+        value: ${{ jobs.check.outputs.skip }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      # A pull_request event doesn't include the commit message, so look it up
+      - id: check
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          TIER: ${{ inputs.tier }}
+        run: |
+          message=$(gh api "repos/$REPOSITORY/commits/$SHA" --jq .commit.message)
+          if grep -qiE "\[(skip|no)-($TIER(-tests)?|tests)\]" <<< "$message"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping the $TIER tests, as the commit message asks"
+          fi

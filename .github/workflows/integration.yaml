@@ -7,7 +7,16 @@ on:
   pull_request:
 
 jobs:
+  check-skip:
+    uses: ./.github/workflows/check-skip.yaml
+    permissions:
+      contents: read
+    with:
+      tier: integration
+
   integration:
+    needs: check-skip
+    if: needs.check-skip.outputs.skip != 'true'
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]

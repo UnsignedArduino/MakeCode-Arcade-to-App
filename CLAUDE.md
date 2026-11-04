@@ -31,6 +31,10 @@ CI runs exactly these commands: `lint.yaml` the lint/format/mypy checks, and
 be under `tests/unit`, `tests/integration` or `tests/e2e`, or collection fails, since a
 test anywhere else would run in no workflow. Test file names must be unique across those
 folders, since they have no `__init__.py`. Warnings are errors in pytest.
+On a PR, `[skip-<tier>-tests]`, `[no-<tier>-tests]`, `[skip-<tier>]` or `[no-<tier>]` in
+the last commit's message skips that tier (`unit`, `integration` or `e2e`; see
+`check-skip.yaml`), `[skip-tests]` or `[no-tests]` skips all three, and GitHub's own
+`[skip ci]` skips every workflow. Pushes to `main` ignore all but `[skip ci]`.
 pre-commit runs ruff check, ruff format --check, and mypy on staged Python files.
 
 Running the tool end to end (installs must happen first, in this order):
