@@ -14,7 +14,9 @@ additions on 2026-11-03, also run locally on Windows only.
 `run_cmd` output logging (issue #15) added on 2026-11-04, checked with the unit
 and integration tests and real builds, locally on Windows only; e2e wasn't
 rerun. Test fixture paths updated for the `tests/fixtures` reorganization on
-2026-11-04, with all test tiers run locally on Windows only._
+2026-11-04, with all test tiers run locally on Windows only. `path_friendly_name` validation
+(issue #17) added on 2026-11-04, checked with the lint, unit and integration
+runs, locally on Windows only; e2e wasn't rerun._
 
 ## Goal
 
@@ -160,7 +162,9 @@ for existing configs; `fetch_code` handles both in one `case`. Relative paths
 (`build_dir`, `path`/`file`
 sources, a `path` icon) are relative to the config file, and unknown keys are
 errors.
-`outputs` needs at least one entry.
+`outputs` needs at least one entry. `project.path_friendly_name` must match
+`^[a-z0-9][a-z0-9._-]*$`, be at most 64 characters, and not be a name reserved
+on Windows (`ntpath.isreserved`, so this applies on every OS).
 
 ## Status
 
@@ -415,6 +419,10 @@ errors.
   `errors="backslashreplace"`, because a redirected stdout on Windows (cp1252)
   lost any record containing Vite's `✓`. Integration tests fake `run_cmd`, so
   this logging is only covered by `tests/unit/test_run.py`.
+- Fixed (issue #17): `project.path_friendly_name` wasn't validated, so a name
+  like `../victim` made a build delete and write outside `build_dir`. It's now
+  checked at config load (see CLI). npm's blocked names, `node_modules` and
+  `favicon.ico`, still pass.
 - **`run_cmd` limits:** a failed command's output is logged about 80 lines
   above the end of stderr, followed by redun's status table and tracebacks, and
   the final `BuildError`

@@ -114,6 +114,55 @@ def test_missing_inputs_field(key: str) -> None:
         load(data)
 
 
+# ------------------------------------------------------- path_friendly_name -----
+
+
+@pytest.mark.parametrize(
+    "name", ["racers", "empty-game", "game_2", "v1.2", "9lives", "a" * 64]
+)
+def test_valid_path_friendly_name(name: str) -> None:
+    data = base_config()
+    data["project"]["path_friendly_name"] = name
+    assert load(data).project.path_friendly_name == name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # Would escape build_dir
+        "../victim",
+        "..",
+        ".",
+        "a/b",
+        "a\\b",
+        "/abs",
+        "C:evil",
+        "C:\\evil",
+        # Not allowed in an npm package name
+        "",
+        "Racers",
+        "my game",
+        ".hidden",
+        "_private",
+        "-flag",
+        "@scope/pkg",
+        "racers\n",
+        "a" * 65,
+        # Reserved on Windows, whichever OS the config is loaded on
+        "con",
+        "nul",
+        "com1",
+        "con.txt",
+        "trailing.",
+    ],
+)
+def test_invalid_path_friendly_name(name: str) -> None:
+    data = base_config()
+    data["project"]["path_friendly_name"] = name
+    with pytest.raises(ValidationError, match="path_friendly_name"):
+        load(data)
+
+
 # -------------------------------------------------------------- unknown keys -----
 
 
