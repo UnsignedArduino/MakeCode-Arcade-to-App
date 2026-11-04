@@ -38,7 +38,7 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
 Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, PNG/UF2/ZIP file source, code/website tasks, redun patches, utils), `tests/fixtures/`, `examples/` (Racers), CI
-workflows `lint.yaml` (ubuntu) and `e2e.yaml` (ubuntu/windows/macos). Tooling: uv,
+workflows `lint.yaml` (ubuntu), `unit.yaml` and `e2e.yaml` (both ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
  
 ## Architecture
@@ -121,8 +121,10 @@ configs; `fetch_code` handles both in one `case`.
   logs to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged
   rebuild; this depends on redun's log format, which is safe while redun is pinned.
   Nothing yet tests that changing an input does trigger a rebuild.
-- **CI** (`lint.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs into any branch,
-  so the stacked PRs get CI. Lint and all three e2e jobs are green on PR #7.
+- **CI** (`lint.yaml`, `unit.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs
+  into any branch, so the stacked PRs get CI. Lint and all three e2e jobs are green on
+  PR #7. `unit.yaml` runs `pytest -m unit` (no Node.js), and `e2e.yaml` runs
+  `pytest -m e2e --no-cov`; neither waits for the other.
 - `tests/unit` covers config parsing of the `git`/`github` sources and
   `clone_and_checkout` against a local repo built with Dulwich (default branch, branch,
   tag, short/full SHA, the same-tree-as-HEAD regression, unknown ref), so it runs

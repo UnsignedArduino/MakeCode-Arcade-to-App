@@ -19,11 +19,15 @@ uv run ruff format --check .     # format check (drop --check to apply)
 uv run mypy .                    # strict type check
 uv run pytest                    # all tests, with a coverage report
 uv run pytest -m unit            # only the fast offline tests (tests/unit)
+uv run pytest -m e2e --no-cov    # only the e2e tests (tests/e2e)
 uv run pytest --no-cov           # skip coverage (e.g. when using a debugger)
 uv run pytest tests/e2e/test_statics.py::test_empty_game_build_to_statics_static
 ```
 
-CI (`lint.yaml`, `e2e.yaml`) runs exactly these lint/format/mypy/pytest commands.
+CI runs exactly these commands: `lint.yaml` the lint/format/mypy checks, and
+`unit.yaml` (`-m unit`) and `e2e.yaml` (`-m e2e --no-cov`) the tests, independently, on
+ubuntu/windows/macos. Every test must be under `tests/unit` or `tests/e2e`, or
+collection fails, since a test in neither would run in neither workflow.
 pre-commit runs ruff check, ruff format --check, and mypy on staged Python files.
 
 Running the tool end to end (installs must happen first, in this order):
