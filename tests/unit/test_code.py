@@ -9,6 +9,7 @@ import requests
 from helpers import (
     TARGET_VERSION,
     CmdCall,
+    FakeResponse,
     FakeRunCmd,
     capture_logger,
     tree_digest,
@@ -235,6 +236,23 @@ def test_build_binary_js(
     assert tree_digest(code_path) == before
 
 
+def test_build_binary_js_replaces_previous_build(
+    tmp_path: Path, mkcd2app_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    code_path = tmp_path / "build" / "test-source"
+    code_path.mkdir(parents=True)
+    build_dir = tmp_path / "build" / "test-binary-js-build"
+    stale = build_dir / "built" / "binary.js"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("old", encoding="utf-8")
+
+    def check_no_stale_build(call: CmdCall) -> None:
+        assert not stale.exists()
+
+    monkeypatch.setattr(code, "run_cmd", FakeRunCmd(check_no_stale_build))
+    build_binary_js.func(ContentDir(str(code_path)), str(build_dir))
+
+
 # ---------------------------------------------------- copy_support_files ------
 
 
@@ -290,16 +308,6 @@ def test_support_files_icon_from_path(tmp_path: Path, sim_html: Path) -> None:
     )
     with Image.open(support / "favicon.ico") as im:
         assert im.format == "ICO"
-
-
-class FakeResponse:
-    def __init__(self, content: bytes, status_code: int = 200) -> None:
-        self.content = content
-        self.status_code = status_code
-
-    def raise_for_status(self) -> None:
-        if self.status_code >= 400:
-            raise requests.HTTPError(f"{self.status_code} error")
 
 
 def test_support_files_icon_from_url(

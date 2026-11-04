@@ -47,6 +47,10 @@ def test_state_paths_under_home(
     assert get_path() == mkcd2app_home / "state" / VERSION / relative
 
 
+def test_build_redun_db_is_in_build_dir(tmp_path: Path) -> None:
+    assert paths.get_redun_db_for_build_path(tmp_path) == tmp_path / ".redun-cache.db"
+
+
 @pytest.mark.parametrize("value", [None, ""])
 def test_no_override_uses_platformdirs(
     monkeypatch: pytest.MonkeyPatch, value: str | None

@@ -490,6 +490,73 @@ def test_noisy_png_has_no_project(tmp_path: Path) -> None:
         read_embedded_files(path)
 
 
+def test_png_with_low_bits_but_no_project(tmp_path: Path) -> None:
+    # The first pixel looks like it says how many bits are used, as in a normal photo
+    path = tmp_path / "photo.png"
+    Image.new("RGBA", (32, 32), (1, 0, 0, 255)).save(path)
+    with pytest.raises(EmbeddedSourceError, match="Invalid magic"):
+        read_embedded_files(path)
+
+
+@pytest.mark.parametrize(
+    "project", [[], {"meta": {}}, {"source": {"main.ts": ""}}], ids=str
+)
+def test_png_project_without_source_string(tmp_path: Path, project: object) -> None:
+    blob = lzma.compress(json.dumps(project).encode(), format=lzma.FORMAT_ALONE)
+    path = tmp_path / "game.png"
+    make_project_png(160, 120, blob, path)
+    with pytest.raises(EmbeddedSourceError, match="has no source"):
+        read_embedded_files(path)
+
+
+@pytest.mark.parametrize("files", [["main.ts"], "main.ts", {"main.ts": 1}], ids=str)
+def test_files_not_a_map_of_strings(tmp_path: Path, files: object) -> None:
+    path = tmp_path / "game.uf2"
+    make_project_uf2(path, {}, json.dumps(files).encode())
+    with pytest.raises(EmbeddedSourceError, match="not a {filename: text} map"):
+        read_embedded_files(path)
+
+
+def test_uf2_magic_without_a_full_block(tmp_path: Path) -> None:
+    path = tmp_path / "game.uf2"
+    path.write_bytes(struct.pack("<2I", UF2_MAGIC0, UF2_MAGIC1) + b"\x00" * 100)
+    with pytest.raises(EmbeddedSourceError, match="Not a UF2 file"):
+        read_embedded_files(path)
+
+
+def test_uf2_without_main_flash_blocks(tmp_path: Path) -> None:
+    block = struct.pack(
+        "<8I", UF2_MAGIC0, UF2_MAGIC1, UF2_FLAG_NOT_MAIN_FLASH, 0, 256, 0, 1, 0
+    ).ljust(512, b"\x00")
+    path = tmp_path / "game.uf2"
+    path.write_bytes(block)
+    with pytest.raises(EmbeddedSourceError, match="Not a UF2 file"):
+        read_embedded_files(path)
+
+
+def test_uf2_skips_unaligned_source_magic(tmp_path: Path) -> None:
+    # 5 + 8 + 3 bytes puts the real source at offset 16, after a decoy at offset 5
+    decoy = b"\xaa" * 5 + SOURCE_MAGIC + b"\xaa" * 3
+    path = tmp_path / "game.uf2"
+    _write_uf2(path, decoy + _source_payload())
+    assert read_embedded_files(path) == SAMPLE_FILES
+
+
+@pytest.mark.parametrize("meta_bytes", [b"[]", b'"text"', b"1"])
+def test_uf2_metadata_not_an_object(tmp_path: Path, meta_bytes: bytes) -> None:
+    path = tmp_path / "game.uf2"
+    make_project_uf2(path, {}, json.dumps(SAMPLE_FILES).encode(), meta_bytes=meta_bytes)
+    with pytest.raises(EmbeddedSourceError, match="not a JSON object"):
+        read_embedded_files(path)
+
+
+def test_uf2_unsupported_compression(tmp_path: Path) -> None:
+    path = tmp_path / "game.uf2"
+    make_project_uf2(path, {"compression": "gzip"}, b"")
+    with pytest.raises(EmbeddedSourceError, match="Unsupported compression gzip"):
+        read_embedded_files(path)
+
+
 def test_uf2_without_source(tmp_path: Path) -> None:
     path = tmp_path / "binary-only.uf2"
     _write_uf2(path, b"\x00" * 4096)
@@ -615,6 +682,23 @@ def test_zip_bomb_rejected(tmp_path: Path) -> None:
                 f.write(chunk)
     with pytest.raises(EmbeddedSourceError, match="uncompressed"):
         read_project_files(src)
+
+
+def test_zip_too_many_entries_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(embedded_source, "ZIP_MAX_ENTRIES", len(SAMPLE_BYTES) - 1)
+    src = tmp_path / "game.zip"
+    make_zip(src, SAMPLE_BYTES)
+    with pytest.raises(EmbeddedSourceError, match="entries"):
+        read_project_files(src)
+
+
+def test_zip_entry_outside_wrapper_is_skipped(tmp_path: Path) -> None:
+    # An entry named "." has no path parts, so it isn't under the wrapper folder
+    src = tmp_path / "game.zip"
+    make_zip(src, {"Game-main/pxt.json": b"{}", ".": b"junk"})
+    assert read_project_files(src) == {"pxt.json": b"{}"}
 
 
 def test_corrupt_zip(tmp_path: Path) -> None:

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import requests
 import yaml
 
 TARGET_VERSION = "4.0.14"
@@ -83,6 +84,23 @@ class FakeRunCmd:
         if self.on_run:
             self.on_run(call)
         return ""
+
+
+class FakeResponse:
+    """Stands in for the ``requests.Response`` that ``requests.get`` returns."""
+
+    def __init__(self, content: bytes, status_code: int = 200) -> None:
+        self.content = content
+        self.status_code = status_code
+
+    @property
+    def text(self) -> str:
+        # What requests falls back to when the server sends no charset
+        return self.content.decode("iso-8859-1")
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code} error")
 
 
 def tree_digest(root: Path) -> dict[str, str]:

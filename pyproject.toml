@@ -48,6 +48,7 @@ strict = true
 testpaths = ["tests"]
 # Coverage is on by default; pass --no-cov to turn it off (e.g. when debugging)
 addopts = ["--strict-markers", "--cov", "--cov-report=term-missing"]
+filterwarnings = ["error"]
 # Applied by directory in tests/conftest.py, so tests don't need to mark themselves
 markers = [
     "unit: fast, offline tests under tests/unit",

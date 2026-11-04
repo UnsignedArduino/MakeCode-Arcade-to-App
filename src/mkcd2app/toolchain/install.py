@@ -51,11 +51,12 @@ def install_js_tools(js_tools: ContentDir) -> ContentDir:
 @task(namespace="mkcd2app")
 def warm_npm_cache_for_templates(templates: ContentDir) -> ContentDir:
     """
-    For every template in the templates directory, copy them to a temporary directory,
-    run `npm ci --cache CACHE_DIR --prefer-online` where CACHE_DIR
+    For every template in the templates directory, copy it to a temporary directory and
+    run `npm ci --cache CACHE_DIR --prefer-online`, where CACHE_DIR is the templates npm
+    cache.
 
     :param templates: The ContentDir pointing to the directory containing the templates.
-    :return: A ContentDir pointing to node_modules, to ensure redun sees that this task
+    :return: A ContentDir pointing to the npm cache, to ensure redun sees that this task
      has something that depends on its results.
     """
     logger.info("Warming npm cache for templates")

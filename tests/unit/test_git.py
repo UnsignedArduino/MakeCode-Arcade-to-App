@@ -87,3 +87,19 @@ def test_commit_sha_matching_default_branch(
 def test_unknown_ref(source_repo: SourceRepo, tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Could not find"):
         clone_and_checkout(str(source_repo.path), tmp_path / "clone", "nope")
+
+
+def test_value_error_without_ref_is_not_retried_as_a_sha(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Only a ref can be mistaken for a commit SHA, so anything else must surface
+    calls: list[str] = []
+
+    def fake_clone(url: str, *args: object, **kwargs: object) -> None:
+        calls.append(url)
+        raise ValueError("some other problem")
+
+    monkeypatch.setattr(porcelain, "clone", fake_clone)
+    with pytest.raises(ValueError, match="some other problem"):
+        clone_and_checkout("https://example.com/a/b", tmp_path / "clone")
+    assert calls == ["https://example.com/a/b"]
