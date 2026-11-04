@@ -23,7 +23,7 @@ inputs:
   # an older alias for git.
   code:
     type: file
-    value: "tests/fixtures/embedded/empty-game.png"
+    value: "embedded/empty-game.png"
 
   assets: {}
     # Icon is optional but highly recommended, it will be used as the favicon
@@ -35,10 +35,11 @@ inputs:
 
 #    icon:
 #      type: path
-#      value: "./examples/Racers icon.png"
+#      value: "../../examples/Racers icon.png"
 
 # Path where the build process will take place
-build_dir: "./examples/testing/empty_game_file_build"
+# Relative paths in this file are relative to this file's directory
+build_dir: "../../examples/testing/empty_game_file_build"
 
 # MakeCode Arcade target version (must be installed with `mkcd2app target install`)
 target: 4.0.14

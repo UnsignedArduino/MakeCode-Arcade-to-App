@@ -61,15 +61,22 @@ redun builds the DAG from how task results feed into other tasks, so data depend
 between tasks must go through task arguments/returns, not side channels.
 
 Build pipeline (`build_project/__init__.py`), each step a task:
-`fetch_code` → `build_binary_js` (runs `mkc`) + `copy_support_files` (simulator HTML
-from the target dir, icon) + `copy_website_template` → `fill_website_template`, plus
-`install_website_deps` (`npm ci` from only the template's `package.json` and lockfile)
-→ one `build_website*` task per entry in `outputs`. A new output type means
-a new `case` arm in that `match` plus a field on `BuildProjectResult`.
+`fetch_code` → `build_binary_js` (runs `mkc` in its own copy of the source) +
+`copy_support_files` (simulator HTML from the target dir, icon) +
+`copy_website_template` → `fill_website_template`, plus `install_website_deps`
+(`npm ci` from only the template's `package.json` and lockfile) → one `build_website*`
+task per entry in `outputs`. A new output type means a new `case` arm in that `match`
+plus a field on `BuildProjectResult`; until then `electron` and `tauri` raise
+`NotImplementedError`.
+
+Relative paths in a config are relative to the config file. `main.py` makes them
+absolute with `resolve_config_paths` before any task runs.
 
 Conventions that matter for redun hashing:
-- Tasks take the config as the raw YAML string and call `load_config_from_yaml` inside;
-  never pass pydantic models as task arguments.
+- `build_project` takes the whole config as JSON (`model_dump_json`) and passes each
+  task only what it uses, as strings (models dumped to JSON). Every argument is part of
+  a task's cache key, so an unused one causes needless reruns. Never pass pydantic
+  models as task arguments.
 - Each stage writes to a fresh directory (named via `_website_dir` in `website.py`) and
   returns a `ContentDir`/`ContentFile`; never modify a path another task returned.
 - `mkcd2app/__init__.py` imports `_redun_compat` first, which monkey-patches redun and

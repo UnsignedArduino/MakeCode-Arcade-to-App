@@ -5,7 +5,9 @@ small known-issue fixes, and the separate deps-install task, and `origin/main` @
 External program requirements audited against `toolchain` @ `4d518d9` on 2026-11-03, then
 updated for the Dulwich git replacement and the generic `git` code source the same day,
 and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the same day.
-Test suite section updated for the unit test expansion on 2026-11-03._
+Test suite section updated for the unit test expansion on 2026-11-03. Config handling
+(per-task config, config-relative paths) verified against `toolchain` @ `3d8cbc0` plus its
+test and doc updates on 2026-11-03, locally on Windows only._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -48,10 +50,14 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
 - **Caching is enabled:** an unchanged rebuild is served entirely from the redun cache.
   Inputs outside the config aren't tracked, so picking up their changes needs
   `--full-rebuild` (see "Out-of-band inputs" under Known issues).
-- **Config is passed to tasks as raw YAML text**, because pickling pydantic objects
-  isn't deterministic and that breaks redun's hashing.
+- **Tasks get only the config they use, as strings**, because pickling pydantic objects
+  isn't deterministic and that breaks redun's hashing. `main.py` resolves the paths and
+  passes `build_project` the whole config as JSON, and it passes each task its part. So
+  YAML comments and formatting don't count, and a title edit reruns only the fill step
+  and `npm run build*`.
 - **Copy-on-write stages:** a path is never written after it's been returned as a
-  `ContentDir`/`ContentFile` (`x-website` → `-filled` → `-filled-built`).
+  `ContentDir`/`ContentFile` (`x-source` → `x-binary-js-build`, which `mkc` builds in;
+  `x-website` → `-filled` → `-filled-built`).
 - **Website builds are offline:** `npm ci --cache <toolchain cache> --offline`.
   `install_website_deps` runs it once in `x-website-deps`, hashing only the template's
   `package.json`/lockfile, so game and asset changes don't bust it. Each
@@ -87,8 +93,10 @@ mkcd2app target install <x.y.z>      # warm mkc compiler cache + download/inline
 mkcd2app build <config.yaml> [--full-rebuild]
 ```
 Also `toolchain uninstall` and `target uninstall <ver>`. `toolchain status` and
-`target list` are **stubs**. `build` has **no pre-flight checks**: a missing target
-fails with a raw `FileNotFoundError`, a missing toolchain with "Executable 'mkc' not found".
+`target list` are **stubs**. `build` has **little pre-flight checking**: `build_project`
+raises if the target isn't installed, naming the install command, and a missing toolchain
+fails with "Executable 'mkc' not found". `--full-rebuild` refuses to delete a non-empty
+`build_dir` that has no `.redun-cache.db`.
  
 State lives under `platformdirs` user dirs, namespaced by mkcd2app version (static
 `0.1.0`). A version bump means re-running both installs. Setting `MKCD2APP_HOME`
@@ -102,7 +110,9 @@ Config: `version`, `project`, `inputs.code` (share_link | git | github | path | 
 `AnyUrl`: https/http/git/file, or ssh:// which needs an `ssh` binary) and an optional
 `ref` (branch, tag, or SHA; omitted = the remote's default branch). `github` is the older
 alias, `{value: <http url>, checkout: <ref, default "master">}`, kept for existing
-configs; `fetch_code` handles both in one `case`.
+configs; `fetch_code` handles both in one `case`. Relative paths (`build_dir`, `path`/`file`
+sources, a `path` icon) are relative to the config file, and unknown keys are errors.
+`outputs` needs at least one entry.
  
 ## Status
 - **Done:** `static` and `static-singlefile` outputs; all code sources, including
@@ -116,7 +126,7 @@ configs; `fetch_code` handles both in one `case`.
   build a private repo until the `git` source handles credentials; toolchain/target split. Everything that needs the network is vendored at install time **except MakeCode
   extensions**, which are fetched per game; `mkc`'s extension cache isn't redirected.
 - **Not implemented:** Electron and Tauri. The models and result fields exist, but
-  `build_project` has no `case` arms for them.
+  their `case` arm in `build_project` raises `NotImplementedError`, before anything runs.
 - **E2E test passes** locally (Windows, ~1 min with installs cached) and in CI on
   ubuntu/windows/macos (PR #7 @ `d7ad64a`). A session fixture sets `MKCD2APP_HOME` to
   `.pytest_cache/d/mkcd2app-home` and runs `toolchain install` and
@@ -152,11 +162,11 @@ configs; `fetch_code` handles both in one `case`.
   `test_redun_compat.py` checks the `get_proto` patch and that directory hashes
   ignore mtimes but change with content, file adds/removes/renames, and path.
   `utils/` (`paths`, `run`, `filesystem`, `resources`) and `extract_meta_comment` have
-  their own small tests. Untested: `cli.py`, `main.py`, the `build_project` DAG
-  wiring, toolchain/target install tasks, and `is_strict_semver`.
+  their own small tests. Untested: `cli.py`, `main.py`, `resolve_config_paths`, the
+  `build_project` DAG wiring, and toolchain/target install tasks.
 - pytest config is in `pyproject.toml`: coverage on by default (`--no-cov` to skip),
   `--strict-markers`, and `unit`/`e2e` markers applied by `tests/conftest.py`. Unit
-  tests cover about 66% of `src/mkcd2app` (run `uv run pytest -m unit`).
+  tests cover about 70% of `src/mkcd2app` (run `uv run pytest -m unit`).
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
@@ -217,7 +227,7 @@ configs; `fetch_code` handles both in one `case`.
 7. Later: code signing, auto-update, README (currently a stub), schema docs.
 ## Known issues
 - **Out-of-band inputs (by design):** `fetch_code` and
-  `copy_support_files` only take the config YAML, so redun can't see changes to a
+  `copy_support_files` only take their part of the config, so redun can't see changes to a
   `path` or `file` code source, a `git`/`github` branch checkout (or omitted `ref`), an icon path/URL, or the installed
   simulator HTML. Editing a path-sourced game returns the old cached build until
   `--full-rebuild`. Decided to rely on that flag for all sources rather than track
@@ -251,3 +261,10 @@ configs; `fetch_code` handles both in one `case`.
   with payload sizes checked against the 476-byte block limit and a 64 MB total
   limit, all before allocating, so a tiny file can't ask for gigabytes.
   `run_redun_task` now closes its SQLite connections after each run.
+- Fixed (from the test suite review, 2026-11-03): any config edit used to rerun nearly the
+  whole build and re-fetch the source (see Architecture). `electron`/`tauri` outputs and an
+  empty `outputs` used to build nothing and exit 0. Relative paths used to resolve against
+  the current directory. Unknown config keys were ignored. `--full-rebuild` deleted
+  `build_dir` without any check. `build_binary_js` built inside `fetch_code`'s output.
+  Creating a logger twice duplicated its handlers. Relative simulator URLs failed at
+  install, and are now resolved against `simUrl`.

@@ -639,10 +639,10 @@ def test_config_file_source() -> None:
     yaml_path = Path(__file__).parent.parent / "fixtures"
     text = (yaml_path / "empty_game_build_to_statics.yaml").read_text(encoding="utf-8")
     text = text.replace(
-        'type: path\n    value: "tests/fixtures/empty_game"',
-        'type: file\n    value: "tests/fixtures/embedded/falling-duck.png"',
+        'type: path\n    value: "empty_game"',
+        'type: file\n    value: "embedded/falling-duck.png"',
     )
     config = load_config_from_yaml(text)
     assert config.inputs.code.root == FileCodeSource(
-        type="file", value="tests/fixtures/embedded/falling-duck.png"
+        type="file", value="embedded/falling-duck.png"
     )

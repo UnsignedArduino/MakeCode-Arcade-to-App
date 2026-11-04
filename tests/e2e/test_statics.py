@@ -153,8 +153,8 @@ def test_empty_game_zip_file_source_build_to_static(tmp_path: Path) -> None:
     # as_posix: backslashes in a double-quoted YAML string are escape sequences
     template = (FIXTURES / "empty_game_file_source.yaml").read_text(encoding="utf-8")
     yaml_text = template.replace(
-        "tests/fixtures/embedded/empty-game.png", zip_path.as_posix()
-    ).replace("./examples/testing/empty_game_file_build", build_dir.as_posix())
+        "embedded/empty-game.png", zip_path.as_posix()
+    ).replace("../../examples/testing/empty_game_file_build", build_dir.as_posix())
     assert zip_path.as_posix() in yaml_text and build_dir.as_posix() in yaml_text
     yaml_path = tmp_path / "empty_game_zip_source.yaml"
     yaml_path.write_text(yaml_text, encoding="utf-8")

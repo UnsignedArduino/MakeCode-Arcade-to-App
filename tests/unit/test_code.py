@@ -11,7 +11,6 @@ from helpers import (
     CmdCall,
     FakeRunCmd,
     capture_logger,
-    make_config_yaml,
     tree_digest,
 )
 from PIL import Image
@@ -37,8 +36,12 @@ def read_mkc_json(code_path: Path) -> Any:
     return json.loads((code_path / "mkc.json").read_text(encoding="utf-8"))
 
 
-def run_fetch_code(build_dir: Path, source: dict[str, Any]) -> Path:
-    result: ContentDir = fetch_code.func(make_config_yaml(build_dir, code=source))
+def run_fetch_code(
+    build_dir: Path, source: dict[str, Any], target: str = TARGET_VERSION
+) -> Path:
+    result: ContentDir = fetch_code.func(
+        json.dumps(source), target, str(build_dir / "test-source")
+    )
     return Path(result.path)
 
 
@@ -64,15 +67,13 @@ def test_fetch_code_replaces_previous_source(tmp_path: Path) -> None:
     assert not stale.exists()
 
 
-def test_mkc_json_uses_config_target(tmp_path: Path) -> None:
-    result: ContentDir = fetch_code.func(
-        make_config_yaml(
-            tmp_path / "build",
-            code={"type": "path", "value": str(EMPTY_GAME_DIR)},
-            target="4.1.27",
-        )
+def test_mkc_json_uses_target(tmp_path: Path) -> None:
+    code_path = run_fetch_code(
+        tmp_path / "build",
+        {"type": "path", "value": str(EMPTY_GAME_DIR)},
+        target="4.1.27",
     )
-    assert read_mkc_json(Path(result.path)) == {
+    assert read_mkc_json(code_path) == {
         "targetWebsite": "https://arcade.makecode.com/v4.1.27"
     }
 
@@ -211,24 +212,26 @@ def test_build_binary_js(
     before = tree_digest(code_path)
 
     def fake_mkc_build(call: CmdCall) -> None:
+        assert (call.cwd / "main.ts").is_file()
         (call.cwd / "built").mkdir()
         (call.cwd / "built" / "binary.js").write_text("// built", encoding="utf-8")
         (call.cwd / "built" / "other.txt").write_text("x", encoding="utf-8")
 
     fake = FakeRunCmd(fake_mkc_build)
     monkeypatch.setattr(code, "run_cmd", fake)
+    build_dir = tmp_path / "build" / "test-binary-js-build"
 
     result: ContentFile = build_binary_js.func(
-        make_config_yaml(tmp_path / "build"), ContentDir(str(code_path))
+        ContentDir(str(code_path)), str(build_dir)
     )
 
     assert [(c.command, c.cwd, c.which_path) for c in fake.calls] == [
-        (["mkc", "build", "-j"], code_path, get_js_tools_bin_dir())
+        (["mkc", "build", "-j"], build_dir, get_js_tools_bin_dir())
     ]
-    output = tmp_path / "build" / "test-binary-js" / "binary.js"
+    output = build_dir / "built" / "binary.js"
     assert Path(result.path) == output
     assert output.read_text(encoding="utf-8") == "// built"
-    # built/ is removed so fetch_code's ContentDir hash doesn't change
+    # Built in a copy, so fetch_code's ContentDir hash doesn't change
     assert tree_digest(code_path) == before
 
 
@@ -257,7 +260,11 @@ def make_png(path: Path, size: tuple[int, int] = (32, 32)) -> Path:
 
 
 def run_copy_support_files(build_dir: Path, icon: dict[str, str] | None) -> Path:
-    result: ContentDir = copy_support_files.func(make_config_yaml(build_dir, icon=icon))
+    result: ContentDir = copy_support_files.func(
+        TARGET_VERSION,
+        json.dumps(icon) if icon else None,
+        str(build_dir / "test-binary-js-support"),
+    )
     return Path(result.path)
 
 

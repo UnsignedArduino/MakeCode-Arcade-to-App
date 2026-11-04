@@ -22,6 +22,7 @@ from mkcd2app.build_project.website import (
     install_website_deps,
     render_title,
 )
+from mkcd2app.config import load_config_from_yaml
 from mkcd2app.models.config import Project
 from mkcd2app.utils.paths import get_templates_npm_cache_dir
 from mkcd2app.utils.resources import get_resource_template_path
@@ -63,11 +64,14 @@ def fill(
     favicon: bytes | None = None,
     project: dict[str, Any] | None = None,
 ) -> Path:
-    bin_js = tmp_path / "build" / "test-binary-js" / "binary.js"
+    bin_js = tmp_path / "build" / "test-binary-js-build" / "built" / "binary.js"
     bin_js.parent.mkdir(parents=True)
     bin_js.write_text(BINARY_JS, encoding="utf-8")
+    config = load_config_from_yaml(
+        make_config_yaml(tmp_path / "build", project=project)
+    )
     result: ContentDir = fill_website_template.func(
-        make_config_yaml(tmp_path / "build", project=project),
+        config.project.model_dump_json(),
         ContentDir(str(website_dir)),
         ContentFile(str(bin_js)),
         ContentDir(str(make_support_dir(tmp_path, favicon))),
@@ -79,12 +83,12 @@ def fill(
 
 
 def test_copy_template_to_build_dir(tmp_path: Path, template_dir: Path) -> None:
-    build_dir = tmp_path / "build"
+    dst = tmp_path / "build" / "test-website"
     result: ContentDir = copy_website_template.func(
-        make_config_yaml(build_dir), ContentDir(str(template_dir))
+        str(dst), ContentDir(str(template_dir))
     )
-    assert Path(result.path) == build_dir / "test-website"
-    assert tree_digest(Path(result.path)) == tree_digest(template_dir)
+    assert Path(result.path) == dst
+    assert tree_digest(dst) == tree_digest(template_dir)
 
 
 def test_copy_template_replaces_previous_copy(
@@ -93,9 +97,7 @@ def test_copy_template_replaces_previous_copy(
     stale = tmp_path / "build" / "test-website" / "stale.txt"
     stale.parent.mkdir(parents=True)
     stale.write_text("old", encoding="utf-8")
-    copy_website_template.func(
-        make_config_yaml(tmp_path / "build"), ContentDir(str(template_dir))
-    )
+    copy_website_template.func(str(stale.parent), ContentDir(str(template_dir)))
     assert not stale.exists()
 
 

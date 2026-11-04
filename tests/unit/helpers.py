@@ -23,11 +23,11 @@ def make_config_yaml(
     target: str = TARGET_VERSION,
 ) -> str:
     """
-    Build a version 1 config as YAML text, the form the redun tasks take.
+    Build a version 1 config as YAML text, like the contents of a config file.
 
     :param build_dir: The config's build_dir.
     :param code: The inputs.code source. Defaults to a path source that doesn't exist,
-     for tasks that never read it.
+     for tests that never read it.
     :param icon: The inputs.assets.icon source, or None for no icon.
     :param project: Keys to override in the project section.
     :param target: The MakeCode Arcade target version.
