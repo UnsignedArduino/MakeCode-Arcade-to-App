@@ -63,9 +63,15 @@ Notes on the integration tests:
   function. What each change should rerun is the `CHANGES` table in `test_rebuilds.py`.
 
 Notes on the e2e tests:
-- Run pytest from the repo root: tests use `Path.cwd()` and repo-relative paths, and
-  shell out to the installed `mkcd2app` executable rather than importing it.
-- Builds go to `examples/testing/empty_game_build/`, which the module fixture deletes.
+- Run pytest from the repo root: tests use repo-relative paths, and shell out to the
+  installed `mkcd2app` executable rather than importing it.
+- Builds go in temp folders, each with a copy of the game and config next to each other,
+  since a config's relative paths are relative to it. A full build takes about a minute,
+  so share one (module fixtures) where a test only needs to read the output.
+- `--run-network` also runs the tests marked `network`, which need a public share link.
+  CI doesn't pass it.
+- `tests/fixtures/block_network.cjs` is a Node preload that fails any network connection
+  and logs it, for testing offline builds, as Node ignores `HTTP_PROXY` by default.
 
 ## Architecture
 

@@ -39,7 +39,7 @@ inputs:
 
 # Path where the build process will take place
 # Relative paths in this file are relative to this file's directory
-build_dir: "../../examples/testing/empty_game_file_build"
+build_dir: "./build"
 
 # MakeCode Arcade target version (must be installed with `mkcd2app target install`)
 target: 4.0.14

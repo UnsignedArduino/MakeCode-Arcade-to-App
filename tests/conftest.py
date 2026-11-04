@@ -18,14 +18,28 @@ TESTS_DIR = Path(__file__).parent
 TIERS = ("unit", "integration", "e2e")
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-network",
+        action="store_true",
+        help="Also run the tests marked network, which need more than the toolchain "
+        "install does, like a public MakeCode share link.",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
     """
     Mark each test with its tier by its directory, so `-m unit` selects them.
 
     CI runs each tier as a separate workflow, so a test outside these directories would
     run in none of them; fail collection instead of skipping it quietly.
     """
+    run_network = config.getoption("--run-network")
     for item in items:
+        if not run_network and item.get_closest_marker("network"):
+            item.add_marker(pytest.mark.skip(reason="needs --run-network"))
         parts = item.path.relative_to(TESTS_DIR).parts
         if len(parts) < 2 or parts[0] not in TIERS:
             raise pytest.UsageError(

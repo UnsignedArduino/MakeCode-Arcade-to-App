@@ -8,7 +8,7 @@ and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the sa
 Test suite section updated for the unit test expansion on 2026-11-03. Config handling
 (per-task config, config-relative paths) verified against `toolchain` @ `3d8cbc0` plus its
 test and doc updates on 2026-11-03, locally on Windows only. Test sections updated for
-the integration tier on 2026-11-03, also run locally on Windows only._
+the integration tier and the e2e additions on 2026-11-03, also run locally on Windows only._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -136,7 +136,12 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
   the install cache. The cache test parses the `ALL` row of the job status table redun
   logs to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged
   rebuild; this depends on redun's log format, which is safe while redun is pinned.
-  That a change does trigger a rebuild is covered by the integration tier, not e2e.
+  That a change does trigger a rebuild is covered by the integration tier; e2e checks one
+  real case, a title edit. E2e also builds a `git` source from a local `file://` repo, and
+  checks the title and icon, that both outputs contain `binary.js` and the simulator, and
+  that no page loads scripts or styles from the internet. `block_network.cjs` proves a
+  build (and a title edit) works with Node's network blocked. Builds go in temp folders.
+  The `share_link` test needs `--run-network`, so CI skips it. It takes about 7 minutes.
 - **CI** (`lint.yaml`, `unit.yaml`, `integration.yaml`, `e2e.yaml`) runs on pushes to
   `main` and on PRs into any branch, so the stacked PRs get CI. Lint and all three e2e
   jobs were green on PR #7 @ `d7ad64a`; the newer commits' CI results haven't been
@@ -184,9 +189,9 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
    job-status cache assertion, CI on all PRs).
 2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
    it for out-of-band input changes). Still belongs in the README once that exists.
-3. ~~More unit/integration tests~~ (done). Still to do: more e2e tests (a `git` source,
-   icon and title checks, stronger output checks, a real offline build, one real rebuild
-   after an edit) and moving the e2e builds out of `examples/testing/`.
+3. ~~More unit, integration and e2e tests~~ (done). A browser smoke test (Playwright:
+   no page errors, simulator iframe present) was left out, as it adds a browser install
+   to CI; nothing yet checks that a built site really runs.
 4. Electron, then Tauri (reference: `main`).
 5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
 6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning
@@ -238,6 +243,12 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
      `package.json` and check it in pre-flight.
 7. Later: code signing, auto-update, README (currently a stub), schema docs.
 ## Known issues
+- **`mkc` checks for updates once a day:** it tries `arcade.makecode.com` if its last check
+  (in `~/.pxt/mkc-cache`, which isn't redirected) is over 24 hours old. Offline, that fails,
+  and `mkc` logs it and builds from its cache, so builds still work.
+- **The `static` output only works from a domain root:** `index.html` uses absolute
+  `/assets/...` paths, as `vite.config.ts` sets no `base`, so it breaks in a subfolder
+  (like GitHub Pages' `/<repo>/`) or from `file://`. `static-singlefile` isn't affected.
 - **Out-of-band inputs (by design):** `fetch_code` and
   `copy_support_files` only take their part of the config, so redun can't see changes to a
   `path` or `file` code source, a `git`/`github` branch checkout (or omitted `ref`), an icon path/URL, or the installed
