@@ -31,6 +31,7 @@ dev = [
     "mypy>=2.3.0",
     "pre-commit>=4.6.1",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "pytest-timeout>=2.4.0",
     "ruff>=0.16.0",
     "types-pyyaml>=6.0.12.20260724",
@@ -42,3 +43,16 @@ target-version = "py314"
 [tool.mypy]
 python_version = "3.14"
 strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Coverage is on by default; pass --no-cov to turn it off (e.g. when debugging)
+addopts = ["--strict-markers", "--cov", "--cov-report=term-missing"]
+# Applied by directory in tests/conftest.py, so tests don't need to mark themselves
+markers = [
+    "unit: fast, offline tests under tests/unit",
+    "e2e: slow tests under tests/e2e that install the toolchain and build real games",
+]
+
+[tool.coverage.run]
+source = ["mkcd2app"]
