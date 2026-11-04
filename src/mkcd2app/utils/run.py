@@ -50,8 +50,20 @@ def run_cmd(
     cmd_list = [resolved, *command[1:]]
     logger.debug(f"Running {command} in {cwd}")
     proc = subprocess.run(
-        cmd_list, shell=False, cwd=cwd, capture_output=True, text=True, check=False
+        cmd_list,
+        shell=False,
+        cwd=cwd,
+        capture_output=True,
+        check=False,
+        encoding="utf-8",
+        errors="replace",
     )
+    output = f"{proc.stdout}\n{proc.stderr}"
     if proc.returncode != 0:
-        raise BuildError(command, cwd, proc.returncode, proc.stdout + proc.stderr)
-    return proc.stdout
+        logger.error(
+            f"{command} in {cwd} failed ({proc.returncode}), output is below:\n{output}"
+        )
+        raise BuildError(command, cwd, proc.returncode, output)
+    else:
+        logger.debug(f"{command} in {cwd} output:\n{output}")
+        return proc.stdout

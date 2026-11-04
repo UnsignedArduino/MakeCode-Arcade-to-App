@@ -1,4 +1,6 @@
+import io
 import logging
+import sys
 from pathlib import Path
 
 from mkcd2app.build_project import BuildProjectResult, build_project
@@ -45,6 +47,12 @@ def _clear_build_dir(build_dir: Path) -> None:
 
 
 def main() -> None:
+    # Logged command output can have characters that a redirected stdout's encoding
+    #  can't represent (like cp1252 on Windows), which would lose the whole log record.
+    #  This is what Python already does for stderr.
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(errors="backslashreplace")
+
     args = generate_and_parse_args()
     debug = bool(args.debug)
     if debug:

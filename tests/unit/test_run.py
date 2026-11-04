@@ -1,9 +1,11 @@
+import logging
 import sys
 from pathlib import Path
 
 import pytest
+from helpers import capture_logger
 
-from mkcd2app.utils import paths
+from mkcd2app.utils import paths, run
 from mkcd2app.utils.run import BuildError, run_cmd
 
 
@@ -38,6 +40,43 @@ def test_failure_raises_build_error(tmp_path: Path) -> None:
     assert "to stdout" in err.output
     assert "to stderr" in err.output
     assert "(3)" in str(err)
+
+
+def test_failure_logs_output_at_error_level(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # The markers are split so that they only match the output, as the logged message
+    #  also has the command in it
+    command = python(
+        "import sys; print('to' + '_stdout'); "
+        "print('to' + '_stderr', file=sys.stderr); sys.exit(1)"
+    )
+    with capture_logger(caplog, run.logger), pytest.raises(BuildError):
+        run_cmd(command, cwd=tmp_path)
+    errors = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(errors) == 1
+    assert "to_stdout" in errors[0]
+    assert "to_stderr" in errors[0]
+
+
+def test_success_logs_output_only_at_debug_level(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    command = python("print('to' + '_stdout')")
+    with capture_logger(caplog, run.logger):
+        run_cmd(command, cwd=tmp_path)
+        assert "to_stdout" not in caplog.text
+        with caplog.at_level(logging.DEBUG, logger=run.logger.name):
+            run_cmd(command, cwd=tmp_path)
+    assert [r.levelno for r in caplog.records if "to_stdout" in r.getMessage()] == [
+        logging.DEBUG
+    ]
+
+
+def test_output_is_decoded_as_utf8_replacing_invalid_bytes(tmp_path: Path) -> None:
+    # A checkmark in UTF-8, then a byte that's never valid in UTF-8
+    code = r"import sys; sys.stdout.buffer.write(b'\xe2\x9c\x93 \xff')"
+    assert run_cmd(python(code), cwd=tmp_path) == "✓ �"
 
 
 def test_missing_executable(tmp_path: Path) -> None:

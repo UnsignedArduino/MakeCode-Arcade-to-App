@@ -8,7 +8,9 @@ and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the sa
 Test suite section updated for the unit test expansion on 2026-11-03. Config handling
 (per-task config, config-relative paths) verified against `toolchain` @ `3d8cbc0` plus its
 test and doc updates on 2026-11-03, locally on Windows only. Test sections updated for
-the integration tier and the e2e additions on 2026-11-03, also run locally on Windows only._
+the integration tier and the e2e additions on 2026-11-03, also run locally on Windows only.
+`run_cmd` output logging (issue #15) added on 2026-11-04, checked with the unit and
+integration tests and real builds, locally on Windows only; e2e wasn't rerun._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -300,3 +302,13 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
 - Fixed: the `static` output only worked from a domain root, as its `index.html` used
   absolute `/assets/...` paths. `vite.config.ts` now sets `base: "./"`, so it also works
   from a subfolder like GitHub Pages' `/<repo>/`.
+- Fixed (issue #15): a failed `mkc` or `npm` command's output was only stored in
+  `BuildError.output`, so compile errors were never shown. `run_cmd` now logs the full
+  output at error level on failure and at debug level on success, and decodes it as UTF-8,
+  replacing invalid bytes. `main()` sets stdout to `errors="backslashreplace"`, because a
+  redirected stdout on Windows (cp1252) lost any record containing Vite's `✓`. Integration
+  tests fake `run_cmd`, so this logging is only covered by `tests/unit/test_run.py`.
+- **`run_cmd` limits:** a failed command's output is logged about 80 lines above the end
+  of stderr, followed by redun's status table and tracebacks, and the final `BuildError`
+  line doesn't point back to it. Output also isn't streamed, so a long `npm ci` shows no
+  progress, and there's no timeout.
