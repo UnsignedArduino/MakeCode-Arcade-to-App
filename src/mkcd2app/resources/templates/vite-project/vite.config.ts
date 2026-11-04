@@ -5,6 +5,7 @@ import {viteSingleFile} from "vite-plugin-singlefile";
 
 // https://vite.dev/config/
 export default defineConfig(({mode}) => ({
+  base: "./", // Relative asset paths, so the site also works from a subfolder
   plugins: [
     react(),
     babel({presets: [reactCompilerPreset()]}),

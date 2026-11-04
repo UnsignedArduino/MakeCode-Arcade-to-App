@@ -248,9 +248,9 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
 - **`mkc` checks for updates once a day:** it tries `arcade.makecode.com` if its last check
   (in `~/.pxt/mkc-cache`, which isn't redirected) is over 24 hours old. Offline, that fails,
   and `mkc` logs it and builds from its cache, so builds still work.
-- **The `static` output only works from a domain root:** `index.html` uses absolute
-  `/assets/...` paths, as `vite.config.ts` sets no `base`, so it breaks in a subfolder
-  (like GitHub Pages' `/<repo>/`) or from `file://`. `static-singlefile` isn't affected.
+- **The `static` output needs a web server:** its `index.html` loads module scripts, which
+  browsers don't normally allow from `file://` (not tested here). `static-singlefile` is
+  the one meant to be opened directly.
 - **Out-of-band inputs (by design):** `fetch_code` and
   `copy_support_files` only take their part of the config, so redun can't see changes to a
   `path` or `file` code source, a `git`/`github` branch checkout (or omitted `ref`), an icon path/URL, or the installed
@@ -297,3 +297,6 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
   single-file website, `binary.js` or the installed simulator, crashed the next run
   instead of rerunning its task, so `target uninstall` then `target install` failed (see
   redun patches). Uninstalling something not installed crashed; it now warns.
+- Fixed: the `static` output only worked from a domain root, as its `index.html` used
+  absolute `/assets/...` paths. `vite.config.ts` now sets `base: "./"`, so it also works
+  from a subfolder like GitHub Pages' `/<repo>/`.

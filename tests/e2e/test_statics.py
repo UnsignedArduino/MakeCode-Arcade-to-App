@@ -162,6 +162,14 @@ def test_empty_game_build_to_statics_static(empty_game_build_to_statics: Build) 
     js_files = list((static_dist / "assets").glob("*.js"))
     assert css_files, "expected css files present"
     assert js_files, "expected js files present"
+    # Relative asset paths, so the site also works from a subfolder like /<repo>/
+    index = (static_dist / "index.html").read_text(encoding="utf-8")
+    soup = BeautifulSoup(index, features="html.parser")
+    tags = soup.select("script[src], link[rel=stylesheet], link[rel=modulepreload]")
+    urls = [str(tag.get("src") or tag.get("href")) for tag in tags]
+    assert urls and all(
+        url.startswith("./") and (static_dist / url).is_file() for url in urls
+    ), f"expected relative asset paths to files in the output, got {urls}"
 
 
 def test_static_output_has_the_game_and_simulator(
