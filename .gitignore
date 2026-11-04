@@ -5,3 +5,5 @@ examples/*
 !examples/*.yaml
 !examples/*.png
 .idea
+.coverage
+.coverage.*

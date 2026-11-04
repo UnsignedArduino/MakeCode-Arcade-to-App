@@ -1,0 +1,35 @@
+name: Unit tests
+
+on:
+  push:
+    branches: [ main ]
+  # Any base branch, so stacked PRs get CI too
+  pull_request:
+
+jobs:
+  unit:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Offline and fast; no Node.js or toolchain install needed
+      - name: Run unit tests with coverage
+        run: uv run pytest -m unit
