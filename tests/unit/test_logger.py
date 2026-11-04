@@ -15,24 +15,6 @@ def logger_name(request: pytest.FixtureRequest) -> Iterator[str]:
     logging.Logger.manager.loggerDict.pop(name, None)
 
 
-@pytest.fixture
-def restore_log_levels() -> Iterator[None]:
-    """Put back every logger's level, since set_all_stdout_logger_levels changes all."""
-    all_loggers = logging.Logger.manager.loggerDict
-    before = {
-        name: (lgr.level, [(h, h.level) for h in lgr.handlers])
-        for name, lgr in all_loggers.items()
-        if isinstance(lgr, logging.Logger)
-    }
-    yield
-    for name, lgr in all_loggers.items():
-        if isinstance(lgr, logging.Logger):
-            level, handlers = before.get(name, (logging.NOTSET, []))
-            lgr.setLevel(level)
-            for handler, handler_level in handlers:
-                handler.setLevel(handler_level)
-
-
 def test_create_logger_setup(logger_name: str) -> None:
     logger = create_logger(logger_name, logging.INFO)
     assert logger.name == logger_name

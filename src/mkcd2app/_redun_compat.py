@@ -1,5 +1,6 @@
 import redun.file
-from redun.file import ContentDir, Dir, File
+from redun.file import ContentDir, ContentFile, Dir, File, RedunFileNotFoundError
+from redun.hashing import hash_struct
 
 # Monkey-patch redun.file.get_proto so Windows absolute paths like "E:\..."
 # aren't parsed as having scheme "e" by urllib.parse.urlparse.
@@ -29,7 +30,6 @@ redun.file.get_proto = _patched_get_proto
 def _content_dir_calc_hash(self: Dir, files: list[File] | None = None) -> str:
     if files is None:
         files = list(self)
-    from redun.hashing import hash_struct
 
     return hash_struct([self.type_basename, self.path] + sorted(f.hash for f in files))
 
@@ -47,6 +47,22 @@ def _dir_calc_hash(self: Dir, files: list[File] | None = None) -> str:
 
 
 redun.file.Dir._calc_hash = _dir_calc_hash  # type: ignore[method-assign]
+
+
+# Monkey patch ContentFile so a deleted file counts as changed. redun raises from its
+# cache check instead, so deleting a task's output would crash the next run rather
+# than rerun the task. (File and ContentDir already handle this.)
+_orig_content_file_calc_hash = redun.file.ContentFile._calc_hash
+
+
+def _content_file_calc_hash(self: ContentFile) -> str:
+    try:
+        return _orig_content_file_calc_hash(self)
+    except RedunFileNotFoundError:
+        return hash_struct([self.type_basename, self.path, "missing"])
+
+
+redun.file.ContentFile._calc_hash = _content_file_calc_hash  # type: ignore[method-assign]
 
 
 def assert_pinned_redun_version() -> None:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 import redun.file
-from redun.file import ContentDir, Dir, File
+from redun.file import ContentDir, ContentFile, Dir, File
 
 # Importing mkcd2app applies the patches
 from mkcd2app._redun_compat import (
@@ -128,3 +128,32 @@ def test_hash_includes_path(tree: Path, tmp_path: Path) -> None:
     (copy / "a.txt").write_text("a", encoding="utf-8")
     (copy / "sub" / "b.txt").write_text("b", encoding="utf-8")
     assert content_hash(copy) != content_hash(tree)
+
+
+# ------------------------------------------------------ deleted ContentFile ----
+
+
+def test_deleted_content_file_is_invalid_instead_of_raising(tree: Path) -> None:
+    # Regression: this raised from redun's cache check, crashing the next run
+    path = tree / "a.txt"
+    file = ContentFile(str(path))
+    assert file.hash
+    assert file.is_valid()
+    path.unlink()
+    assert not file.is_valid()
+
+
+def test_recreated_content_file_is_valid_again(tree: Path) -> None:
+    path = tree / "a.txt"
+    file = ContentFile(str(path))
+    assert file.hash
+    path.unlink()
+    path.write_text("a", encoding="utf-8")
+    assert file.is_valid()
+
+
+def test_content_file_hash_still_changes_with_content(tree: Path) -> None:
+    path = tree / "a.txt"
+    before = ContentFile(str(path)).hash
+    path.write_text("A", encoding="utf-8")
+    assert ContentFile(str(path)).hash != before

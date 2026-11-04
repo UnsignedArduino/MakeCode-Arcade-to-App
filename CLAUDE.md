@@ -19,15 +19,18 @@ uv run ruff format --check .     # format check (drop --check to apply)
 uv run mypy .                    # strict type check
 uv run pytest                    # all tests, with a coverage report
 uv run pytest -m unit            # only the fast offline tests (tests/unit)
+uv run pytest -m integration     # only the offline scheduler tests (tests/integration)
 uv run pytest -m e2e --no-cov    # only the e2e tests (tests/e2e)
 uv run pytest --no-cov           # skip coverage (e.g. when using a debugger)
 uv run pytest tests/e2e/test_statics.py::test_empty_game_build_to_statics_static
 ```
 
 CI runs exactly these commands: `lint.yaml` the lint/format/mypy checks, and
-`unit.yaml` (`-m unit`) and `e2e.yaml` (`-m e2e --no-cov`) the tests, independently, on
-ubuntu/windows/macos. Every test must be under `tests/unit` or `tests/e2e`, or
-collection fails, since a test in neither would run in neither workflow.
+`unit.yaml` (`-m unit`), `integration.yaml` (`-m integration`) and `e2e.yaml`
+(`-m e2e --no-cov`) the tests, independently, on ubuntu/windows/macos. Every test must
+be under `tests/unit`, `tests/integration` or `tests/e2e`, or collection fails, since a
+test anywhere else would run in no workflow. Test file names must be unique across those
+folders, since they have no `__init__.py`. Warnings are errors in pytest.
 pre-commit runs ruff check, ruff format --check, and mypy on staged Python files.
 
 Running the tool end to end (installs must happen first, in this order):
@@ -38,15 +41,26 @@ uv run mkcd2app target install 4.0.14
 uv run mkcd2app --debug build "examples/Racers.yaml"
 ```
 
-Notes on the unit tests:
-- `tests/conftest.py` marks every test `unit` or `e2e` by its directory, and holds
-  the `mkcd2app_home` fixture (points `MKCD2APP_HOME` at a temp dir). Keep it the only
-  `conftest.py`: mypy fails on two modules both named `conftest`.
+Notes on the tests:
+- `tests/conftest.py` marks every test with its tier by its directory, and holds the
+  shared fixtures, such as `mkcd2app_home` (points `MKCD2APP_HOME` at a temp dir). Keep
+  it the only `conftest.py`: mypy fails on two modules both named `conftest`.
 - Shared helpers (`make_config_yaml`, `FakeRunCmd`, `capture_logger`, ...) are in
-  `tests/unit/helpers.py`, imported as `from helpers import ...`.
+  `tests/helpers.py`, imported as `from helpers import ...`.
+
+Notes on the unit tests:
 - Call a redun task's plain function with `.func(...)`, and monkeypatch `run_cmd` in
   the module under test, so no `npm`/`mkc` runs.
 - Our loggers set `propagate = False`, so `caplog` needs `capture_logger` to see them.
+
+Notes on the integration tests:
+- They run the real `main()` and redun scheduler in this process, with `run_cmd` faked,
+  so no Node.js is needed. Use the `project` fixture (a game with a config and an
+  installed target) or `cli` (runs any command), which return what ran as a `Ran`.
+- `FakeToolchain` does to the disk what each `mkc` and `npm` command would, and fails the
+  test on any other command, so a new command needs a new case there.
+- `TaskSpy` records the tasks that really ran, since a cache hit doesn't call a task's
+  function. What each change should rerun is the `CHANGES` table in `test_rebuilds.py`.
 
 Notes on the e2e tests:
 - Run pytest from the repo root: tests use `Path.cwd()` and repo-relative paths, and

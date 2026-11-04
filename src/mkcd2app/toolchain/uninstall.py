@@ -21,5 +21,8 @@ def uninstall_toolchain() -> None:
     logger.info("Uninstalling toolchain")
 
     toolchain_path = get_toolchain_dir()
+    if not toolchain_path.exists():
+        logger.warning("Toolchain is not installed, nothing to uninstall")
+        return
     logger.debug(f"Removing toolchain directory {toolchain_path}")
     rmtree_robust(toolchain_path)

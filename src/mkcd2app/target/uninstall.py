@@ -23,5 +23,8 @@ def uninstall_target(version: str) -> None:
     logger.info(f"Uninstall MakeCode Arcade target version {version}")
 
     target_path = get_target_version_dir(version)
+    if not target_path.exists():
+        logger.warning(f"Target {version} is not installed, nothing to uninstall")
+        return
     logger.debug(f"Removing target directory {target_path}")
     rmtree_robust(target_path)

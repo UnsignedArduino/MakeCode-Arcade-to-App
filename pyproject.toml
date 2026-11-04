@@ -52,6 +52,7 @@ filterwarnings = ["error"]
 # Applied by directory in tests/conftest.py, so tests don't need to mark themselves
 markers = [
     "unit: fast, offline tests under tests/unit",
+    "integration: fast, offline tests under tests/integration that run the real redun scheduler with fake commands",
     "e2e: slow tests under tests/e2e that install the toolchain and build real games",
 ]
 

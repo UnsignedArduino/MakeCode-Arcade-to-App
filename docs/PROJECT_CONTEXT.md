@@ -7,7 +7,8 @@ updated for the Dulwich git replacement and the generic `git` code source the sa
 and for the `file` code source (PNG/UF2 with embedded project, then ZIPs) the same day.
 Test suite section updated for the unit test expansion on 2026-11-03. Config handling
 (per-task config, config-relative paths) verified against `toolchain` @ `3d8cbc0` plus its
-test and doc updates on 2026-11-03, locally on Windows only._
+test and doc updates on 2026-11-03, locally on Windows only. Test sections updated for
+the integration tier on 2026-11-03, also run locally on Windows only._
  
 ## Goal
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade games into a
@@ -39,8 +40,8 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
 | `utils/` | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
 | `resources/` | Vite+React+TS template, `mkc` js_tools, empty fixture project |
  
-Other: `tests/e2e/test_statics.py`, `tests/unit/` (config code sources, `utils/git`, PNG/UF2/ZIP file source, code/website tasks, redun patches, utils), `tests/fixtures/`, `examples/` (Racers), CI
-workflows `lint.yaml` (ubuntu), `unit.yaml` and `e2e.yaml` (both ubuntu/windows/macos). Tooling: uv,
+Other: `tests/e2e/test_statics.py`, `tests/unit/` (each module on its own), `tests/integration/` (the real scheduler with fake commands), `tests/fixtures/`, `examples/` (Racers), CI
+workflows `lint.yaml` (ubuntu), `unit.yaml`, `integration.yaml` and `e2e.yaml` (all ubuntu/windows/macos). Tooling: uv,
 hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
  
 ## Architecture
@@ -64,8 +65,9 @@ hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
   `build_website*` task copies that `node_modules` into its own copy of the filled site
   and runs only `npm run build*`.
 - **redun patches** (`_redun_compat.py`): `get_proto` (Windows drive letters),
-  `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes).
-  Covered by `tests/unit/test_redun_compat.py`.
+  `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not mtimes),
+  `ContentFile._calc_hash` (a deleted file counts as changed, instead of raising from the
+  cache check). Covered by `tests/unit/test_redun_compat.py`.
 - **Uninstalls are never cached** (`cache_scope=CacheScope.NONE`): they return
   `None`, so a cached result couldn't notice a reinstall. Install tasks return
   `ContentDir`/`ContentFile`, which redun re-validates, so they stay cached.
@@ -134,11 +136,20 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
   the install cache. The cache test parses the `ALL` row of the job status table redun
   logs to stderr and requires `DONE == 0` and `CACHED == TOTAL` on an unchanged
   rebuild; this depends on redun's log format, which is safe while redun is pinned.
-  Nothing yet tests that changing an input does trigger a rebuild.
-- **CI** (`lint.yaml`, `unit.yaml`, `e2e.yaml`) runs on pushes to `main` and on PRs
-  into any branch, so the stacked PRs get CI. Lint and all three e2e jobs are green on
-  PR #7. `unit.yaml` runs `pytest -m unit` (no Node.js), and `e2e.yaml` runs
-  `pytest -m e2e --no-cov`; neither waits for the other.
+  That a change does trigger a rebuild is covered by the integration tier, not e2e.
+- **CI** (`lint.yaml`, `unit.yaml`, `integration.yaml`, `e2e.yaml`) runs on pushes to
+  `main` and on PRs into any branch, so the stacked PRs get CI. Lint and all three e2e
+  jobs were green on PR #7 @ `d7ad64a`; the newer commits' CI results haven't been
+  checked. `unit.yaml` and `integration.yaml` run `pytest -m unit` and
+  `pytest -m integration` (no Node.js), and `e2e.yaml` runs `pytest -m e2e --no-cov`;
+  none waits for another.
+- `tests/integration` runs the real `main()` and redun scheduler in-process with
+  `run_cmd` faked by `FakeToolchain` (`tests/helpers.py`), and takes about 2 minutes, as
+  each build goes through redun. It covers the `build_project` wiring, the `CHANGES` table
+  of exactly which tasks and commands each kind of edit reruns (`test_rebuilds.py`),
+  deleted outputs, the copy-on-write rule (`TaskSpy` records what each task returned),
+  failure and retry, `main()` end to end, and toolchain/target install, uninstall and
+  reinstall. The symlink test skips on Windows, so only CI runs it.
 - `tests/unit` covers config parsing of the `git`/`github` sources and
   `clone_and_checkout` against a local repo built with Dulwich (default branch, branch,
   tag, short/full SHA, the same-tree-as-HEAD regression, unknown ref), so it runs
@@ -162,19 +173,20 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
   `test_redun_compat.py` checks the `get_proto` patch and that directory hashes
   ignore mtimes but change with content, file adds/removes/renames, and path.
   `utils/` (`paths`, `run`, `filesystem`, `resources`) and `extract_meta_comment` have
-  their own small tests. Untested: `cli.py`, `main.py`, `resolve_config_paths`, the
-  `build_project` DAG wiring, and toolchain/target install tasks.
+  their own small tests, as do `cli.py`, `_clear_build_dir`, config loading and
+  `resolve_config_paths`, and the toolchain/target install tasks.
 - pytest config is in `pyproject.toml`: coverage on by default (`--no-cov` to skip),
   `--strict-markers`, and `unit`/`e2e` markers applied by `tests/conftest.py`. Unit
-  tests cover about 70% of `src/mkcd2app` (run `uv run pytest -m unit`).
+  tests cover about 94% of `src/mkcd2app`, and integration tests about 86%, or 99% together
+  (run `uv run pytest -m "unit or integration"`). Warnings are errors.
 ## Roadmap
 1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching on,
    job-status cache assertion, CI on all PRs).
 2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text says to use
    it for out-of-band input changes). Still belongs in the README once that exists.
-3. More unit/integration tests: `cli.py`/`main.py`, `build_project` wiring with
-   `run_cmd` stubbed, and the toolchain/target install tasks (redun patches, code and
-   website tasks, and utils are covered).
+3. ~~More unit/integration tests~~ (done). Still to do: more e2e tests (a `git` source,
+   icon and title checks, stronger output checks, a real offline build, one real rebuild
+   after an edit) and moving the e2e builds out of `examples/testing/`.
 4. Electron, then Tauri (reference: `main`).
 5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
 6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache, version-pinning
@@ -268,3 +280,7 @@ sources, a `path` icon) are relative to the config file, and unknown keys are er
   `build_dir` without any check. `build_binary_js` built inside `fetch_code`'s output.
   Creating a logger twice duplicated its handlers. Relative simulator URLs failed at
   install, and are now resolved against `simUrl`.
+- Fixed (found by the integration tests): deleting a `ContentFile` output, such as the
+  single-file website, `binary.js` or the installed simulator, crashed the next run
+  instead of rerunning its task, so `target uninstall` then `target install` failed (see
+  redun patches). Uninstalling something not installed crashed; it now warns.
