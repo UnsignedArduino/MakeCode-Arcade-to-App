@@ -16,7 +16,9 @@ and integration tests and real builds, locally on Windows only; e2e wasn't
 rerun. Test fixture paths updated for the `tests/fixtures` reorganization on
 2026-11-04, with all test tiers run locally on Windows only. `path_friendly_name` validation
 (issue #17) added on 2026-11-04, checked with the lint, unit and integration
-runs, locally on Windows only; e2e wasn't rerun._
+runs, locally on Windows only; e2e wasn't rerun. `path` source and `build_dir`
+overlap check (issue #16) added on 2026-11-06, checked with lint, all test tiers
+and real builds, locally on Windows only._
 
 ## Goal
 
@@ -164,7 +166,10 @@ sources, a `path` icon) are relative to the config file, and unknown keys are
 errors.
 `outputs` needs at least one entry. `project.path_friendly_name` must match
 `^[a-z0-9][a-z0-9._-]*$`, be at most 64 characters, and not be a name reserved
-on Windows (`ntpath.isreserved`, so this applies on every OS).
+on Windows (`ntpath.isreserved`, so this applies on every OS). A `path` code
+source and `build_dir` can't overlap: `resolve_config_paths` rejects either one
+inside the other, or both being the same folder, so a config kept in the game's
+folder needs a `build_dir` like `../build`.
 
 ## Status
 
@@ -172,9 +177,9 @@ on Windows (`ntpath.isreserved`, so this applies on every OS).
   including
   `file` (a PNG or UF2 downloaded from the editor, or a ZIP of the project such
   as GitHub's "Download ZIP", detected by magic bytes; decoded by
-  `build_project/inputs/embedded_source.py`, and `fetch_code` warns if
-  `pxt.json`'s
-  `targetVersions.target` differs from `target`). A ZIP's root is wherever
+  `build_project/inputs/embedded_source.py`). For every code source, `fetch_code`
+  warns if `pxt.json`'s
+  `targetVersions.target` differs from `target`. A ZIP's root is wherever
   `pxt.json`
   is: at the top level or inside one wrapping folder (`<repo>-<branch>/`),
   which is stripped. Everything under it is extracted, binary files included.
@@ -423,6 +428,12 @@ on Windows (`ntpath.isreserved`, so this applies on every OS).
   like `../victim` made a build delete and write outside `build_dir`. It's now
   checked at config load (see CLI). npm's blocked names, `node_modules` and
   `favicon.ico`, still pass.
+- Fixed (issue #16): a `path` source containing `build_dir` copied itself
+  until the OS rejected the path, and a `path` source inside a stage directory
+  was deleted before it was copied. Both are now config errors (see CLI), raised
+  before `--full-rebuild` clears anything. A `file` source or `path` icon inside
+  `build_dir` isn't checked, so a build can still delete it. A `path` source next
+  to `build_dir` still copies its own `built/`, `node_modules/` and `pxt_modules/`.
 - **`run_cmd` limits:** a failed command's output is logged about 80 lines
   above the end of stderr, followed by redun's status table and tracebacks, and
   the final `BuildError`

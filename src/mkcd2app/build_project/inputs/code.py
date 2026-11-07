@@ -91,7 +91,8 @@ def fetch_code(code_source_json: str, target: str, code_dir: str) -> ContentDir:
             # Raises EmbeddedSourceError (with the file path) if there's no project
             files = extract_project(src_file, code_path)
             logger.debug(f"Extracted {len(files)} files: {', '.join(files)}")
-            _warn_on_target_mismatch(code_path / "pxt.json", target)
+
+    _warn_on_target_mismatch(code_path / "pxt.json", target)
 
     mkc_json_path = code_path / "mkc.json"
     logger.debug("Writing mkc.json")

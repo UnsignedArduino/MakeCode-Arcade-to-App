@@ -350,6 +350,45 @@ def test_resolve_leaves_urls_alone(tmp_path: Path, code: dict[str, Any]) -> None
     assert resolved.inputs.assets.icon == config.inputs.assets.icon
 
 
+@pytest.mark.parametrize(
+    ("source", "build_dir", "message"),
+    [
+        (".", "build", "is inside the path code source"),
+        (".", "a/b/build", "is inside the path code source"),
+        ("../game", "build", "is inside the path code source"),
+        ("game", "game", "is inside the path code source"),
+        ("build/game", "build", "is inside build_dir"),
+        ("build/g-source/game", "build", "is inside build_dir"),
+    ],
+)
+def test_resolve_rejects_overlapping_source_and_build_dir(
+    tmp_path: Path, source: str, build_dir: str, message: str
+) -> None:
+    base = tmp_path / "game"
+    config = load_with_paths({"type": "path", "value": source}, None, build_dir)
+    with pytest.raises(ValueError, match=message):
+        resolve_config_paths(config, base)
+
+
+def test_resolve_rejects_build_dir_inside_a_linked_source(tmp_path: Path) -> None:
+    game = tmp_path / "game"
+    game.mkdir()
+    link = tmp_path / "link"
+    try:
+        link.symlink_to(game, target_is_directory=True)
+    except OSError:
+        pytest.skip("Creating symlinks isn't allowed here")
+    config = load_with_paths({"type": "path", "value": str(link)}, None, "build")
+    with pytest.raises(ValueError, match="is inside the path code source"):
+        resolve_config_paths(config, game)
+
+
+def test_resolve_allows_names_that_only_share_a_prefix(tmp_path: Path) -> None:
+    config = load_with_paths({"type": "path", "value": "game"}, None, "game-build")
+    resolved = resolve_config_paths(config, tmp_path)
+    assert resolved.build_dir == str((tmp_path / "game-build").resolve())
+
+
 def test_resolve_does_not_modify_the_config(tmp_path: Path) -> None:
     config = load_with_paths(
         {"type": "path", "value": "game"}, {"type": "path", "value": "icon.png"}

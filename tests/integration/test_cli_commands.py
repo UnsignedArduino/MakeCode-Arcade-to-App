@@ -136,11 +136,38 @@ def test_full_rebuild_with_no_previous_build(project: GameProject) -> None:
 def test_full_rebuild_refuses_a_folder_that_is_not_a_build_dir(
     project: GameProject, fake_toolchain: FakeToolchain, task_spy: TaskSpy
 ) -> None:
-    # `build_dir: "."`, say: this would delete the game and the config
-    project.config["build_dir"] = "."
+    # A mistake in `build_dir` that points at something else the user owns
+    documents = project.root / "documents"
+    documents.mkdir()
+    (documents / "notes.txt").write_text("keep me", encoding="utf-8")
+    project.config["build_dir"] = "documents"
     project.write_config()
     with pytest.raises(RuntimeError, match="Refusing to clear"):
         project.build("--full-rebuild")
     assert_nothing_ran(fake_toolchain, task_spy)
+    assert (documents / "notes.txt").is_file()
+
+
+def test_full_rebuild_rejects_a_build_dir_containing_the_source(
+    project: GameProject, fake_toolchain: FakeToolchain, task_spy: TaskSpy
+) -> None:
+    # `build_dir: "."`, say: this would delete the game and the config
+    project.config["build_dir"] = "."
+    project.write_config()
+    with pytest.raises(ValueError, match="is inside build_dir"):
+        project.build("--full-rebuild")
+    assert_nothing_ran(fake_toolchain, task_spy)
     assert project.config_path.is_file()
     assert (project.game / "main.ts").is_file()
+
+
+def test_build_rejects_a_build_dir_inside_the_source(
+    project: GameProject, fake_toolchain: FakeToolchain, task_spy: TaskSpy
+) -> None:
+    # The config's own folder is the game, as it would be for a local game
+    project.config["inputs"]["code"]["value"] = "."
+    project.write_config()
+    with pytest.raises(ValueError, match="is inside the path code source"):
+        project.build()
+    assert_nothing_ran(fake_toolchain, task_spy)
+    assert not project.build_dir.exists()
