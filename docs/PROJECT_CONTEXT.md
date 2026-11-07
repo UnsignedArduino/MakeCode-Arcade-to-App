@@ -1,30 +1,19 @@
 # MakeCode-Arcade-to-App Rewrite — Project Context
 
-_Verified against `toolchain` @ `d7ad64a` plus the `MKCD2APP_HOME` change, the
-small known-issue fixes, and the separate deps-install task, and
-`origin/main` @ `d31e2a5`, as of 2026-10-29. External program requirements
-audited against `toolchain` @ `4d518d9` on 2026-11-03, then updated for the
-Dulwich git replacement and the generic `git` code source the same day, and for
-the `file` code source (PNG/UF2 with embedded project, then ZIPs) the same day.
-Test suite section updated for the unit test expansion on 2026-11-03. Config
-handling (per-task config, config-relative paths) verified against
-`toolchain` @ `3d8cbc0` plus its test and doc updates on 2026-11-03, locally on
-Windows only. Test sections updated for the integration tier and the e2e
-additions on 2026-11-03, also run locally on Windows only.
-`run_cmd` output logging (issue #15) added on 2026-11-04, checked with the unit
-and integration tests and real builds, locally on Windows only; e2e wasn't
-rerun. Test fixture paths updated for the `tests/fixtures` reorganization on
-2026-11-04, with all test tiers run locally on Windows only. `path_friendly_name` validation
-(issue #17) added on 2026-11-04, checked with the lint, unit and integration
-runs, locally on Windows only; e2e wasn't rerun. `path` source and `build_dir`
-overlap check (issue #16) added on 2026-11-06, checked with lint, all test tiers
-and real builds, locally on Windows only._
+_Verified as of 2026-11-07, against `toolchain` @ `3bf8a76`. Keep this line to
+the latest check, and note any test tier that wasn't run or any OS it wasn't
+run on._
+
+Commands, test conventions and the build pipeline are in `AGENTS.md`. This doc
+holds what the code can't tell you: status, decisions, plans and open problems.
+Fixed bugs don't belong here; their reasoning goes in code comments and
+regression tests.
 
 ## Goal
 
 Rewrite `UnsignedArduino/MakeCode-Arcade-to-App` (converts MakeCode Arcade
 games into a static website, Electron app, or Tauri app). The original was
-basically a bash script written in Python. The rewrite turns it into an
+basically a bash script zwritten in Python. The rewrite turns it into an
 incremental build system that runs in CI and copes with churn in the JS
 ecosystem.
 
@@ -34,9 +23,7 @@ ecosystem.
 main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = dag)
 ```
 
-- The work is on `toolchain`: 53 commits ahead of `main`, 13 ahead of `dag`
-  (`b9c2ab2`)
-  as of `d7ad64a`.
+- The work is on `toolchain`.
 - `main` has 2 legacy-only fixes (`d17b052`, `d31e2a5`) to files the rewrite
   deleted. Merging gives 2 modify/delete conflicts; resolve them by keeping the
   deletions.
@@ -46,244 +33,104 @@ main (legacy)  ←  PR #6 `dag` (draft)  ←  PR #7 `toolchain` (draft, base = d
   `tauri-output` branches are merged and out of date. The legacy code can't be
   ported as is; it has to be reimplemented on the new pipeline.
 
-## Layout (`src/mkcd2app/`)
+## Status
 
-| Path                    | Purpose                                                                                                    |
-|-------------------------|------------------------------------------------------------------------------------------------------------|
-| `__init__.py`           | Applies redun patches, asserts redun version                                                               |
-| `main.py`, `cli.py`     | argparse CLI → redun tasks                                                                                 |
-| `_redun_compat.py`      | redun monkey-patches                                                                                       |
-| `config/`, `models/`    | YAML loader; pydantic `BuildConfig`, `BinaryJSMetadata`                                                    |
-| `build_project/`        | `build_project` task, website tasks, code inputs                                                           |
-| `toolchain/`, `target/` | install/uninstall tasks                                                                                    |
-| `utils/`                | `run_cmd`, paths (platformdirs), `run_redun_task`, `rmtree_robust`, semver, `git` (Dulwich clone/checkout) |
-| `resources/`            | Vite+React+TS template, `mkc` js_tools, empty fixture project                                              |
+- **Done:** `static` and `static-singlefile` outputs; all code sources
+  (`share_link`,
+  `git`, `github`, `path`, and `file` for a PNG, UF2 or ZIP); the
+  toolchain/target split.
+- **Not implemented:** Electron and Tauri. Their `case` arm in `build_project`
+  raises
+  `NotImplementedError` before anything runs.
+- **Stubs:** `toolchain status` and `target list`.
 
-Other: `tests/e2e/test_statics.py`, `tests/unit/` (each module on its own),
-`tests/integration/` (the real scheduler with fake commands),
-`tests/fixtures/`, `examples/` (Racers), CI workflows `lint.yaml` (ubuntu),
-`unit.yaml`, `integration.yaml` and `e2e.yaml` (all ubuntu/windows/macos).
-Tooling: uv, hatchling, Python ≥3.14, ruff + mypy strict, pre-commit.
+## Layout
 
-## Architecture
+In `src/mkcd2app/`:
 
-- **redun `0.44.1`** (pinned) is the DAG engine, embedded via
-  `utils/run_redun_task.py`. Each command keeps its own SQLite DB (toolchain,
-  target, or `build_dir/.redun-cache.db`).
-- **Caching is enabled:** an unchanged rebuild is served entirely from the
-  redun cache. Inputs outside the config aren't tracked, so picking up their
-  changes needs
-  `--full-rebuild` (see "Out-of-band inputs" under Known issues).
-- **Tasks get only the config they use, as strings**, because pickling pydantic
-  objects isn't deterministic and that breaks redun's hashing. `main.py`
-  resolves the paths and passes `build_project` the whole config as JSON, and
-  it passes each task its part. So YAML comments and formatting don't count,
-  and a title edit reruns only the fill step and `npm run build*`.
-- **Copy-on-write stages:** a path is never written after it's been returned as
-  a
-  `ContentDir`/`ContentFile` (`x-source` → `x-binary-js-build`, which `mkc`
-  builds in;
-  `x-website` → `-filled` → `-filled-built`).
+| Path                    | Purpose                                                  |
+|-------------------------|----------------------------------------------------------|
+| `main.py`, `cli.py`     | argparse CLI → redun tasks                               |
+| `_redun_compat.py`      | redun monkey-patches                                     |
+| `config/`, `models/`    | YAML loader; pydantic config and metadata models         |
+| `build_project/`        | `build_project` task, website tasks, `inputs/` (sources) |
+| `toolchain/`, `target/` | install/uninstall tasks                                  |
+| `utils/`                | `run_cmd`, paths, `run_redun_task`, Dulwich `git`, etc.  |
+| `resources/`            | Vite template, `mkc` js_tools, empty project             |
+
+Tests are in `tests/{unit,integration,e2e}`, and an example config is in
+`examples/`.
+
+## Commands
+
+Run the installs first, in this order:
+
+```bash
+uv sync
+uv run mkcd2app toolchain install
+uv run mkcd2app target install 4.0.14
+uv run mkcd2app --debug build "examples/Racers.yaml"    # add --full-rebuild to start over
+uv run mkcd2app target uninstall 4.0.14
+uv run mkcd2app toolchain uninstall
+```
+
+Checks:
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy .
+uv run pytest -m unit
+uv run pytest -m integration
+uv run pytest -m e2e --no-cov
+```
+
+## Decisions
+
+- **Caching:** redun's cache is on, and each command has its own SQLite DB
+  (toolchain, target, or `build_dir/.redun-cache.db`). What each kind of edit
+  should rerun is the
+  `CHANGES` table in `tests/integration/test_rebuilds.py`.
+- **Out-of-band inputs aren't tracked:** redun can't see changes to a `path` or
+  `file`
+  code source, a `git`/`github` branch checkout (or omitted `ref`), an icon
+  path/URL, or the installed simulator HTML. Editing a path-sourced game
+  returns the old cached build until `--full-rebuild`. We decided to rely on
+  that flag for all sources rather than track each one.
 - **Website builds are offline:** `npm ci --cache <toolchain cache> --offline`.
-  `install_website_deps` runs it once in `x-website-deps`, hashing only the
-  template's
-  `package.json`/lockfile, so game and asset changes don't bust it. Each
-  `build_website*` task copies that `node_modules` into its own copy of the
-  filled site and runs only `npm run build*`.
-- **redun patches** (`_redun_compat.py`): `get_proto` (Windows drive letters),
-  `ContentDir._calc_hash` and `Dir._calc_hash` (hash file contents, not
-  mtimes),
-  `ContentFile._calc_hash` (a deleted file counts as changed, instead of
-  raising from the cache check). Covered by `tests/unit/test_redun_compat.py`.
-- **Uninstalls are never cached** (`cache_scope=CacheScope.NONE`): they return
-  `None`, so a cached result couldn't notice a reinstall. Install tasks return
-  `ContentDir`/`ContentFile`, which redun re-validates, so they stay cached.
+  Everything that needs the network is vendored at install time **except
+  MakeCode extensions**, which are fetched per game. The npm cache holds
+  platform-specific binaries, so it only works on the OS/arch that ran
+  `toolchain install`.
+- **Uninstalls are never cached:** they return `None`, so a cached result
+  couldn't notice a reinstall. Install tasks return `ContentDir`/`ContentFile`,
+  which redun re-validates, so they stay cached.
+- **State dirs** are namespaced by mkcd2app version (static `0.1.0`), so a
+  version bump means re-running both installs. `MKCD2APP_HOME` moves them, but
+  not `mkc`'s own compiler/extension caches.
+- **`github` source** is an older alias of `git`, kept for existing configs.
 
 ## External programs
 
-`run_cmd` only ever runs `npm` and `mkc`:
+`run_cmd` only ever runs `npm` and `mkc`.
 
-- **Node.js ≥ 22.12 + npm, on PATH. Always required.** The floor comes from
-  `@rolldown/plugin-babel` (`>=22.12.0`); vite 8 / rolldown accept
-  `^20.19 || >=22.12`,
-  `makecode` only needs ≥14. `mkc` is a Node script, so `node` must be on PATH
-  too. Nothing declares or checks this yet. Distro Node packages (e.g. Ubuntu
-  apt) are too old.
-- **Not git:** `git` (and `github`) code sources are cloned with Dulwich (pure
-  Python,
-  `utils/git.py`). The default branch and branches/tags get `depth=1` (+
-  `branch=`); anything else is taken as a (short) SHA and gets a full clone +
-  `porcelain.checkout`. That clone checks out the default branch first, because
-  Dulwich's checkout only writes files that differ from the current HEAD tree
-  and leaves an empty worktree when the target's tree matches HEAD.
-- **Not needed:** system Python (uv downloads 3.14), a C compiler (all Python
-  deps have wheels except `redun`, which is a pure-Python sdist), npm native
-  build tools (rolldown/lightningcss ship prebuilt optional binaries;
-  `fsevents` is macOS-only).
-- The offline npm cache holds platform-specific binaries, so it only works on
-  the OS/arch that ran `toolchain install`.
-
-## CLI
-
-Global `--debug` (goes before the subcommand). Commands must run in this order:
-
-```
-mkcd2app toolchain install           # mkc CLI + warm template npm cache
-mkcd2app target install <x.y.z>      # warm mkc compiler cache + download/inline simulator HTML
-mkcd2app build <config.yaml> [--full-rebuild]
-```
-
-Also `toolchain uninstall` and `target uninstall <ver>`. `toolchain status` and
-`target list` are **stubs**. `build` has **little pre-flight checking**:
-`build_project`
-raises if the target isn't installed, naming the install command, and a missing
-toolchain fails with "Executable 'mkc' not found". `--full-rebuild` refuses to
-delete a non-empty
-`build_dir` that has no `.redun-cache.db`.
-
-State lives under `platformdirs` user dirs, namespaced by mkcd2app version
-(static
-`0.1.0`). A version bump means re-running both installs. Setting
-`MKCD2APP_HOME`
-moves them to `$MKCD2APP_HOME/{data,state}/<version>` (`utils/paths.py`); the
-value is
-`~`-expanded and made absolute, since subprocesses run in other directories.
-`mkc`'s own compiler/extension caches aren't covered by this.
-
-Config: `version`, `project`, `inputs.code` (share_link | git | github | path |
-file),
-`inputs.assets.icon` (optional), `build_dir`, `target` (required, strict
-`x.y.z`),
-`outputs` (static | static-singlefile | electron | tauri). `git` takes `url`
-(pydantic
-`AnyUrl`: https/http/git/file, or ssh:// which needs an `ssh` binary) and an
-optional
-`ref` (branch, tag, or SHA; omitted = the remote's default branch). `github` is
-the older alias, `{value: <http url>, checkout: <ref, default "master">}`, kept
-for existing configs; `fetch_code` handles both in one `case`. Relative paths
-(`build_dir`, `path`/`file`
-sources, a `path` icon) are relative to the config file, and unknown keys are
-errors.
-`outputs` needs at least one entry. `project.path_friendly_name` must match
-`^[a-z0-9][a-z0-9._-]*$`, be at most 64 characters, and not be a name reserved
-on Windows (`ntpath.isreserved`, so this applies on every OS). A `path` code
-source and `build_dir` can't overlap: `resolve_config_paths` rejects either one
-inside the other, or both being the same folder, so a config kept in the game's
-folder needs a `build_dir` like `../build`.
-
-## Status
-
-- **Done:** `static` and `static-singlefile` outputs; all code sources,
-  including
-  `file` (a PNG or UF2 downloaded from the editor, or a ZIP of the project such
-  as GitHub's "Download ZIP", detected by magic bytes; decoded by
-  `build_project/inputs/embedded_source.py`). For every code source, `fetch_code`
-  warns if `pxt.json`'s
-  `targetVersions.target` differs from `target`. A ZIP's root is wherever
-  `pxt.json`
-  is: at the top level or inside one wrapping folder (`<repo>-<branch>/`),
-  which is stripped. Everything under it is extracted, binary files included.
-  Symlinks are skipped, and there are entry-count and 512 MB uncompressed
-  limits. It's the way to build a private repo until the `git` source handles
-  credentials; toolchain/target split. Everything that needs the network is
-  vendored at install time **except MakeCode extensions**, which are fetched
-  per game; `mkc`'s extension cache isn't redirected.
-- **Not implemented:** Electron and Tauri. The models and result fields exist,
-  but their `case` arm in `build_project` raises `NotImplementedError`, before
-  anything runs.
-- **E2E test passes** locally (Windows, ~1 min with installs cached) and in CI
-  on ubuntu/windows/macos (PR #7 @ `d7ad64a`). A session fixture sets
-  `MKCD2APP_HOME` to
-  `.pytest_cache/d/mkcd2app-home` and runs `toolchain install` and
-  `target install 4.0.14` there, so the real user dirs are untouched and reruns
-  hit the install cache. The cache test parses the `ALL` row of the job status
-  table redun logs to stderr and requires `DONE == 0` and `CACHED == TOTAL` on
-  an unchanged rebuild; this depends on redun's log format, which is safe while
-  redun is pinned. That a change does trigger a rebuild is covered by the
-  integration tier; e2e checks one real case, a title edit. E2e also builds a
-  `git` source from a local `file://` repo, and checks the title and icon, that
-  both outputs contain `binary.js` and the simulator, and that no page loads
-  scripts or styles from the internet. `block_network.cjs` proves a build (and
-  a title edit) works with Node's network blocked. Builds go in temp folders.
-  The `share_link` test needs `--run-network`, so CI skips it. It takes about 7
-  minutes.
-- **CI** (`lint.yaml`, `unit.yaml`, `integration.yaml`, `e2e.yaml`) runs on
-  pushes to
-  `main` and on PRs into any branch, so the stacked PRs get CI. All four were
-  green on PR #7 @ `316dbc0`. `unit.yaml` and `integration.yaml` run
-  `pytest -m unit` and
-  `pytest -m integration` (no Node.js), and `e2e.yaml` runs
-  `pytest -m e2e --no-cov`; none waits for another. On a PR, a tag in the last
-  commit's message, like
-  `[skip-e2e-tests]` or `[no-unit]`, skips that tier, and `[skip-tests]` or
-  `[no-tests]`
-  skips all three (`check-skip.yaml`, a reusable workflow each one calls). A
-  skipped job counts as passing. Pushes to `main` ignore these tags, so what's
-  merged still gets tested.
-- `tests/integration` runs the real `main()` and redun scheduler in-process
-  with
-  `run_cmd` faked by `FakeToolchain` (`tests/helpers.py`), and takes about 2
-  minutes, as each build goes through redun. It covers the `build_project`
-  wiring, the `CHANGES` table of exactly which tasks and commands each kind of
-  edit reruns (`test_rebuilds.py`), deleted outputs, the copy-on-write rule
-  (`TaskSpy` records what each task returned), failure and retry, `main()` end
-  to end, and toolchain/target install, uninstall and reinstall. The symlink
-  test skips on Windows, so only CI runs it.
-- `tests/unit` covers config parsing of the `git`/`github` sources and
-  `clone_and_checkout` against a local repo built with Dulwich (default branch,
-  branch, tag, short/full SHA, the same-tree-as-HEAD regression, unknown ref),
-  so it runs offline. Fixture commits pass `sign=False`, since Dulwich honours
-  a user's
-  `commit.gpgsign`. `test_embedded_source.py` covers the `file` source with
-  synthetic PNG (including overflow rows) and UF2 (LZMA and plain) round trips,
-  error cases and path traversal, plus real editor exports in
-  `tests/fixtures/mkcd_projects/`: the
-  "falling duck" PNG (512×424) and UF2, both saved from 4.1.27 and identical
-  once decoded, and `empty-game.png` from 4.0.14, which matches
-  `tests/fixtures/mkcd_projects/empty_game`
-  except for the formatting of `pxt.json`, and `Racers-master.zip` (GitHub "Download
-  ZIP" of Racers, saved with 2.0.48; it builds on 4.0.14 with the mismatch
-  warning but pulls GitHub extensions, so it isn't in e2e). ZIP cases also
-  cover the wrapper folder, no or ambiguous `pxt.json`, symlinks, traversal,
-  the size limit and truncation. The e2e suite also builds `empty-game.png`
-  through
-  `empty_game_file_source_build_statics.yaml`, and a ZIP of
-  `tests/fixtures/mkcd_projects/empty_game` made at test time with a
-  GitHub-style `empty_game-master/` wrapper (checked byte for byte against the
-  checkout, so CRLF on Windows is fine). The duck builds end to end on 4.1.27,
-  and on 4.0.14 with the version-mismatch warning, but isn't in e2e.
-- `test_code.py` and `test_website.py` run every code-input and website task
-  through
-  `.func` with `run_cmd` (and `clone_and_checkout`, `requests.get`,
-  `get_sim_html_path`) monkeypatched, against a copy of the real bundled
-  template.
-  `test_redun_compat.py` checks the `get_proto` patch and that directory hashes
-  ignore mtimes but change with content, file adds/removes/renames, and path.
-  `utils/` (`paths`, `run`, `filesystem`, `resources`) and
-  `extract_meta_comment` have their own small tests, as do `cli.py`,
-  `_clear_build_dir`, config loading and
-  `resolve_config_paths`, and the toolchain/target install tasks.
-- pytest config is in `pyproject.toml`: coverage on by default (`--no-cov` to
-  skip),
-  `--strict-markers`, and `unit`/`e2e` markers applied by `tests/conftest.py`.
-  Unit tests cover about 94% of `src/mkcd2app`, and integration tests about
-  86%, or 99% together (run `uv run pytest -m "unit or integration"`). Warnings
-  are errors.
+- **Node.js ≥ 22.12 + npm, on PATH, always required.** The floor comes from
+  `@rolldown/plugin-babel`; vite 8 / rolldown accept `^20.19 || >=22.12`, and
+  `makecode`
+  only needs ≥14. `mkc` is a Node script, so `node` must be on PATH too.
+  Nothing declares or checks this yet. Distro Node packages (e.g. Ubuntu apt)
+  are too old.
+- **Not needed:** git (Dulwich handles clones; an `ssh://` URL needs an `ssh`
+  binary), system Python (uv downloads 3.14), a C compiler (all Python deps
+  have wheels except
+  `redun`, a pure-Python sdist), npm native build tools (rolldown/lightningcss
+  ship prebuilt binaries).
 
 ## Roadmap
 
-1. ~~Fix e2e + CI~~ (done: fixture `target:`, isolated install fixture, caching
-   on, job-status cache assertion, CI on all PRs).
-2. ~~Rename `--clear-cache`~~ (done: now `--full-rebuild`, and its help text
-   says to use it for out-of-band input changes). Still belongs in the README
-   once that exists.
-3. ~~More unit, integration and e2e tests~~ (done). A browser smoke test
-   (Playwright:
-   no page errors, simulator iframe present) was left out, as it adds a browser
-   install to CI; nothing yet checks that a built site really runs.
-4. Electron, then Tauri (reference: `main`).
-5. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
-6. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache,
+1. Electron, then Tauri (reference: `main`).
+2. Save-state for Electron/Tauri (investigate `pxtsim` postMessage).
+3. Toolchain polish: `status`/`list`, `build` pre-flight, extension cache,
    version-pinning UX, and cutting external dependencies so that "only uv
    installed" works for static and Electron outputs:
     - **Node: managed by default, system as an opt-in.** `toolchain install`
@@ -326,14 +173,12 @@ folder needs a `build_dir` like `../build`.
       electron-builder helper) binaries into a redirected cache so the offline
       `npm ci` still works. Cross-building, e.g. Windows targets from
       macOS/Linux, needs Wine; out of scope.
-    - ~~**Drop the `git` binary**~~ (done: Dulwich clone + checkout,
-      `depth=1` +
-      `branch=` for branches/tags, full clone for SHAs; see External programs).
-      ~~Generalise the source to `git: {url, ref}`~~ (done, `github` kept as an
-      alias). Still to do: private repos need credentials handled by us (no
-      system credential helper); a token embedded in the URL would work but
-      gets logged and written to the clone's `.git/config`. pygit2 (libgit2
-      bundled in its wheels) is the compiled alternative.
+    - **Private git repos:** need credentials handled by us (no system
+      credential helper). A token embedded in the URL would work but gets
+      logged and written to the clone's
+      `.git/config`. pygit2 (libgit2 bundled in its wheels) is the compiled
+      alternative. Until then, a ZIP through the `file` source is the way to
+      build a private repo.
     - **Distribution:** publish to PyPI so `uvx mkcd2app` /
       `uv tool install mkcd2app` is the install story. A PyInstaller build (one
       per OS/arch; `--collect-data mkcd2app`; check that redun works when
@@ -342,10 +187,15 @@ folder needs a `build_dir` like `../build`.
     - **Declare the Node floor:** add `"engines": {"node": ">=22.12"}` to the
       template's
       `package.json` and check it in pre-flight.
-7. Later: code signing, auto-update, README (currently a stub), schema docs.
+4. Later: code signing, auto-update, README (currently a stub; should cover
+   `--full-rebuild`), schema docs.
 
 ## Known issues
 
+- **Little pre-flight checking in `build`:** `build_project` raises if the
+  target isn't installed, naming the install command, but a missing toolchain
+  only fails with
+  "Executable 'mkc' not found".
 - **`mkc` checks for updates once a day:** it tries `arcade.makecode.com` if
   its last check (in `~/.pxt/mkc-cache`, which isn't redirected) is over 24
   hours old. Offline, that fails, and `mkc` logs it and builds from its cache,
@@ -353,89 +203,28 @@ folder needs a `build_dir` like `../build`.
 - **The `static` output needs a web server:** its `index.html` loads module
   scripts, which browsers don't normally allow from `file://` (not tested
   here). `static-singlefile` is the one meant to be opened directly.
-- **Out-of-band inputs (by design):** `fetch_code` and
-  `copy_support_files` only take their part of the config, so redun can't see
-  changes to a
-  `path` or `file` code source, a `git`/`github` branch checkout (or omitted
-  `ref`), an icon path/URL, or the installed simulator HTML. Editing a
-  path-sourced game returns the old cached build until
-  `--full-rebuild`. Decided to rely on that flag for all sources rather than
-  track each one.
-- Fixed: the website dep install used to hash the whole filled site, so any
-  asset change re-ran `npm ci`; it's now its own task (see Architecture).
-- Fixed: `download_sim` now decodes downloads as UTF-8 instead of `res.text`,
-  and all text file reads/writes in `src/` pass `encoding="utf-8"`. (The 4.0.14
-  simulator was pure ASCII, so this hadn't caused damage yet.) Also fixed: the
-  `uninstall_toolchain`
-  docstring, `get_resource_template_path(name)` ignoring `name`,
-  `load_config_from_yaml` raising `AttributeError` on an unknown version, the
-  stale
-  `fill_website_template` docstring, and the stray comment in
-  `Racers offline.yaml`.
-
-- Fixed (from the test-coverage review): `is_strict_semver` accepted a trailing
-  newline (now `fullmatch`), and `BuildConfig.target` is now validated as
-  strict semver at config load. `project.title` is no longer passed through
-  `str.format`:
-  `render_title` substitutes only `{NAME}`/`{VERSION}`/`{AUTHOR}` in one pass
-  and leaves other braces literal. The title is HTML-escaped into `index.html`,
+- **Files inside `build_dir` aren't all protected:** a `path` source
+  overlapping
+  `build_dir` is a config error, but a `file` source or `path` icon inside it
+  isn't checked, so a build can still delete it. A `path` source next to
+  `build_dir` still copies its own `built/`, `node_modules/` and
+  `pxt_modules/`.
+- **`path_friendly_name`** still accepts npm's blocked names, `node_modules`
   and
-  `fill_index_html` raises if the template's `<title>`/favicon markers aren't
-  each present exactly once, instead of silently shipping "vite-project" and no
-  icon. Covered by `tests/unit/test_semver.py` and the `render_title`/
-  `fill_index_html`
-  tests in `tests/unit/test_website.py`.
-- Fixed (from the Codex review of PR #7): uninstalls were cached no-ops on a
-  second run (see Architecture); a relative `MKCD2APP_HOME` gave relative
-  `mkc`/`--cache`
-  paths that subprocesses resolved against their own cwd. PNG/UF2 projects with
-  emoji failed to import: LZMA-JS writes CESU-8 (each UTF-16 code unit
-  separately), so the decoder now works in UTF-16 code units, which also keeps
-  UF2 `headerSize` (a JS string length) correct. Fixtures made by real LZMA-JS
-  are in
-  `tests/fixtures/lzma-js/` (`generate.cjs` regenerates them). UF2 blocks
-  are now reassembled into runs (gaps over 1 MB split a run, like pxt's
-  `toBin`), with payload sizes checked against the 476-byte block limit and a
-  64 MB total limit, all before allocating, so a tiny file can't ask for
-  gigabytes.
-  `run_redun_task` now closes its SQLite connections after each run.
-- Fixed (from the test suite review, 2026-11-03): any config edit used to rerun
-  nearly the whole build and re-fetch the source (see Architecture).
-  `electron`/`tauri` outputs and an empty `outputs` used to build nothing and
-  exit 0. Relative paths used to resolve against the current directory. Unknown
-  config keys were ignored. `--full-rebuild` deleted
-  `build_dir` without any check. `build_binary_js` built inside `fetch_code`'s
-  output. Creating a logger twice duplicated its handlers. Relative simulator
-  URLs failed at install, and are now resolved against `simUrl`.
-- Fixed (found by the integration tests): deleting a `ContentFile` output, such
-  as the single-file website, `binary.js` or the installed simulator, crashed
-  the next run instead of rerunning its task, so `target uninstall` then
-  `target install` failed (see redun patches). Uninstalling something not
-  installed crashed; it now warns.
-- Fixed: the `static` output only worked from a domain root, as its
-  `index.html` used absolute `/assets/...` paths. `vite.config.ts` now sets
-  `base: "./"`, so it also works from a subfolder like GitHub Pages'
-  `/<repo>/`.
-- Fixed (issue #15): a failed `mkc` or `npm` command's output was only stored
-  in
-  `BuildError.output`, so compile errors were never shown. `run_cmd` now logs
-  the full output at error level on failure and at debug level on success, and
-  decodes it as UTF-8, replacing invalid bytes. `main()` sets stdout to
-  `errors="backslashreplace"`, because a redirected stdout on Windows (cp1252)
-  lost any record containing Vite's `✓`. Integration tests fake `run_cmd`, so
-  this logging is only covered by `tests/unit/test_run.py`.
-- Fixed (issue #17): `project.path_friendly_name` wasn't validated, so a name
-  like `../victim` made a build delete and write outside `build_dir`. It's now
-  checked at config load (see CLI). npm's blocked names, `node_modules` and
-  `favicon.ico`, still pass.
-- Fixed (issue #16): a `path` source containing `build_dir` copied itself
-  until the OS rejected the path, and a `path` source inside a stage directory
-  was deleted before it was copied. Both are now config errors (see CLI), raised
-  before `--full-rebuild` clears anything. A `file` source or `path` icon inside
-  `build_dir` isn't checked, so a build can still delete it. A `path` source next
-  to `build_dir` still copies its own `built/`, `node_modules/` and `pxt_modules/`.
+  `favicon.ico`.
 - **`run_cmd` limits:** a failed command's output is logged about 80 lines
   above the end of stderr, followed by redun's status table and tracebacks, and
-  the final `BuildError`
-  line doesn't point back to it. Output also isn't streamed, so a long `npm ci`
-  shows no progress, and there's no timeout.
+  the final `BuildError` line doesn't point back to it. Output also isn't
+  streamed, so a long `npm ci` shows no progress, and there's no timeout.
+- **Test gaps:**
+    - Nothing checks that a built site really runs. A Playwright smoke test (no
+      page errors, simulator iframe present) was left out, as it adds a browser
+      install to CI.
+    - Integration tests fake `run_cmd`, so its logging is only covered by
+      `tests/unit/test_run.py`.
+    - The symlink integration test skips on Windows, so only CI runs it.
+    - The `share_link` e2e test needs `--run-network` (about 7 minutes), so CI
+      skips it.
+    - `Racers-master.zip` and the falling-duck exports aren't in e2e: Racers
+      pulls GitHub extensions, and the duck was saved from 4.1.27 (it builds on
+      4.0.14 with the version-mismatch warning).
