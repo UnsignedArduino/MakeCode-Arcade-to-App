@@ -1,0 +1,1 @@
+{"pxt.json":"{\"name\":\"emoji 😀 game\",\"dependencies\":{\"device\":\"*\"}}","main.ts":"game.splash(\"hello 😀\")\r\nlet s = \"é ✓ 𝄞\"\n","README.md":"# 🦆 Duck\n"}

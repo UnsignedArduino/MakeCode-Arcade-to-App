@@ -1,17 +1,92 @@
 import base64
+import html
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 
 from redun import task
 from redun.file import ContentDir, ContentFile
 
-from mkcd2app.config import load_config_from_yaml
+from mkcd2app.models.config import Project
 from mkcd2app.utils.logger import create_logger
+from mkcd2app.utils.paths import get_templates_npm_cache_dir
 from mkcd2app.utils.run import run_cmd
 
 logger = create_logger(name=__name__, level=logging.INFO)
+
+
+TITLE_PLACEHOLDER = re.compile(r"\{(NAME|VERSION|AUTHOR)\}")
+
+INDEX_HTML_TITLE_MARKER = "<title>vite-project</title>"
+INDEX_HTML_FAVICON_MARKER = (
+    '<link rel="icon" href="./favicon.ico" type="image/x-icon" />'
+)
+
+
+def render_title(project: Project) -> str:
+    """
+    Substitute ``{NAME}``, ``{VERSION}`` and ``{AUTHOR}`` in ``project.title``.
+
+    Done in a single pass, so substituted values are never expanded again. Any
+    other braces are kept as is (this is deliberately not ``str.format``, which
+    crashes on unknown fields and allows format specs and attribute access).
+
+    :param project: The project metadata.
+    :return: The rendered (unescaped) title.
+    """
+    values = {
+        "NAME": project.name,
+        "VERSION": project.version,
+        "AUTHOR": project.author,
+    }
+    return TITLE_PLACEHOLDER.sub(lambda m: values[m.group(1)], project.title)
+
+
+def _replace_marker_once(text: str, marker: str, replacement: str) -> str:
+    """
+    Replace ``marker`` in ``text``, requiring it to occur exactly once.
+
+    :raises RuntimeError: If the marker is missing or occurs more than once, which
+     means the template has drifted from what the filler expects.
+    """
+    count = text.count(marker)
+    if count != 1:
+        raise RuntimeError(
+            f"Template index.html must contain {marker!r} exactly once, "
+            f"found {count} occurrence(s)"
+        )
+    return text.replace(marker, replacement)
+
+
+def fill_index_html(
+    index_html_text: str, title: str, favicon: bytes | None = None
+) -> str:
+    """
+    Set the title and (optionally) inline the favicon in the template's index.html.
+
+    :param index_html_text: The template's index.html.
+    :param title: The rendered, unescaped title. It is HTML-escaped here.
+    :param favicon: The favicon.ico bytes to inline as a data URI, or None to leave
+     the favicon link alone.
+    :return: The filled index.html.
+    :raises RuntimeError: If a marker the filler relies on is missing.
+    """
+    index_html_text = _replace_marker_once(
+        index_html_text,
+        INDEX_HTML_TITLE_MARKER,
+        f"<title>{html.escape(title, quote=False)}</title>",
+    )
+    if favicon is not None:
+        favicon_b64 = base64.b64encode(favicon).decode("ascii")
+        favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"
+        index_html_text = _replace_marker_once(
+            index_html_text,
+            INDEX_HTML_FAVICON_MARKER,
+            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />',
+        )
+    return index_html_text
 
 
 def _website_dir(build_dir: Path, name: str, suffix: str) -> Path:
@@ -20,20 +95,19 @@ def _website_dir(build_dir: Path, name: str, suffix: str) -> Path:
 
 
 @task(namespace="mkcd2app")
-def copy_website_template(config_yaml: str, template_src: ContentDir) -> ContentDir:
+def copy_website_template(website_dir: str, template_src: ContentDir) -> ContentDir:
     """
     Copy the template to the build directory.
 
-    Example input: config_yaml, template_src
+    Example input: racers-website, template_src
     Example output: racers-website
 
-    :param config_yaml: The raw YAML text of the config file.
+    :param website_dir: The directory to copy the template to.
     :param template_src: A redun.ContentDir pointing to the template source,
                          so that redun tracks changes to template files.
     :return: A redun.ContentDir that points to the Vite website template directory.
     """
-    config = load_config_from_yaml(config_yaml)
-    dst = _website_dir(Path(config.build_dir), config.project.path_friendly_name, "")
+    dst = Path(website_dir)
     logger.info(f"Website will be copied to {dst}")
     if dst.exists():
         shutil.rmtree(dst)
@@ -45,7 +119,7 @@ def copy_website_template(config_yaml: str, template_src: ContentDir) -> Content
 
 @task(namespace="mkcd2app")
 def fill_website_template(
-    config_yaml: str,
+    project_json: str,
     website_path: ContentDir,
     bin_js_path: ContentFile,
     support_path: ContentDir,
@@ -56,15 +130,15 @@ def fill_website_template(
     Example intput: racers-website
     Example output: racers-website-filled
 
-    :param config_yaml: The raw YAML text of the config file.
-    :param website_path: redun.ContentDir pointing to the deps-installed website.
+    :param project_json: The config's Project dumped to a JSON string.
+    :param website_path: redun.ContentDir pointing to the copied website template.
     :param bin_js_path: redun.ContentFile pointing to the binary JS file.
     :param support_path: redun.ContentDir pointing to the support file directory.
     :return: A redun.ContentDir pointing to the filled website directory.
     """
     logger.info("Filling website template")
 
-    config = load_config_from_yaml(config_yaml)
+    project = Project.model_validate_json(project_json)
     src = Path(website_path.path)
     dst = src.parent / f"{src.name}-filled"
     if dst.exists():
@@ -83,68 +157,101 @@ def fill_website_template(
     logger.debug(f"Copying ---simulator.html from {simulator_html_path}")
     shutil.copy(simulator_html_path, asset_path)
 
-    title = config.project.title.format(
-        NAME=config.project.name,
-        VERSION=config.project.version,
-        AUTHOR=config.project.author,
-    )
+    title = render_title(project)
     logger.debug(f'Using title "{title}" in index.html')
-    index_html_path = dst / "index.html"
-    index_html_text = index_html_path.read_text()
-    index_html_text = index_html_text.replace(
-        "<title>vite-project</title>", f"<title>{title}</title>"
-    )
-
     favicon_path = Path(support_path.path) / "favicon.ico"
-    if favicon_path.exists():
-        favicon_b64 = base64.b64encode(favicon_path.read_bytes()).decode("ascii")
-        favicon_data_uri = f"data:image/x-icon;base64,{favicon_b64}"
-        index_html_text = index_html_text.replace(
-            '<link rel="icon" href="./favicon.ico" type="image/x-icon" />',
-            f'<link rel="icon" href="{favicon_data_uri}" type="image/x-icon" />',
-        )
+    favicon = favicon_path.read_bytes() if favicon_path.exists() else None
+    index_html_path = dst / "index.html"
+    index_html_text = fill_index_html(
+        index_html_path.read_text(encoding="utf-8"), title, favicon
+    )
+    if favicon is not None:
         logger.debug("Inlined favicon.ico into index.html")
-
-    index_html_path.write_text(index_html_text)
+    index_html_path.write_text(index_html_text, encoding="utf-8")
 
     logger.debug("Updating package.json")
     package_json_path = dst / "package.json"
-    package_json = json.loads(package_json_path.read_text())
-    package_json["name"] = config.project.path_friendly_name
-    package_json["version"] = config.project.version
-    package_json["description"] = config.project.description
-    package_json["authors"] = {"name": config.project.author}
-    package_json_path.write_text(json.dumps(package_json, indent=2))
+    package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
+    package_json["name"] = project.path_friendly_name
+    package_json["version"] = project.version
+    package_json["description"] = project.description
+    package_json["authors"] = {"name": project.author}
+    package_json_path.write_text(json.dumps(package_json, indent=2), encoding="utf-8")
 
     logger.debug("Website template filled")
     return ContentDir(str(dst))
 
 
 @task(namespace="mkcd2app")
-def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDir:
+def install_website_deps(
+    deps_dir: str, package_json: ContentFile, package_lock: ContentFile
+) -> ContentDir:
     """
-    Make a copy of the template website, then ``npm ci`` and `npm run build` in it.
+    ``npm ci`` the template's dependencies in their own directory.
+
+    Only package.json and package-lock.json are inputs, so changing the game or its
+    assets doesn't bust the cached install. The template's unfilled package.json is
+    used because filling only changes metadata that ``npm ci`` ignores.
+
+    Example input: racers-website-deps, package.json, package-lock.json
+    Example output: racers-website-deps/node_modules
+
+    :param deps_dir: The directory to install into.
+    :param package_json: A redun.ContentFile pointing to the template's package.json.
+    :param package_lock: A redun.ContentFile pointing to the template's lockfile.
+    :return: A redun.ContentDir pointing to the installed node_modules.
+    """
+    dst = Path(deps_dir)
+    logger.info("Installing website dependencies")
+
+    if dst.exists():
+        shutil.rmtree(dst)
+    dst.mkdir(parents=True)
+    shutil.copy(package_json.path, dst / "package.json")
+    shutil.copy(package_lock.path, dst / "package-lock.json")
+
+    cache_path = get_templates_npm_cache_dir()
+    logger.debug(f"Using template npm cache at {cache_path} to install")
+
+    run_cmd(["npm", "ci", "--cache", str(cache_path), "--offline"], cwd=dst)
+    logger.debug("Website dependencies installed")
+
+    return ContentDir(str(dst / "node_modules"))
+
+
+def _copy_site_with_deps(src: Path, dst: Path, node_modules: ContentDir) -> None:
+    """Copy the filled site to ``dst`` and put a copy of ``node_modules`` in it."""
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+    # Keep symlinks as symlinks: on POSIX node_modules/.bin entries are relative
+    #  symlinks, and copying their targets breaks the scripts' relative imports
+    shutil.copytree(node_modules.path, dst / "node_modules", symlinks=True)
+
+
+@task(namespace="mkcd2app")
+def build_website(
+    website_filled_path: ContentDir, node_modules: ContentDir
+) -> ContentDir:
+    """
+    Make a copy of the filled website with node_modules, then `npm run build` in it.
 
     We copy so that we never mutate a ContentDir that another task owns,
     keeping ContentDir hashes stable for caching.
 
-    Example input: racers-website-filled
-    Example output: racers-website-filled-built
+    Example input: racers-website-filled, racers-website-deps/node_modules
+    Example output: racers-website-filled-built/dist
 
-    :param website_filled_path: A redun.ContentDir pointing to the template website.
+    :param website_filled_path: A redun.ContentDir pointing to the filled website.
+    :param node_modules: A redun.ContentDir pointing to the installed dependencies.
     :return: A redun.ContentDir pointing to the directory of static HTML/CSS/JS files
      ready to serve.
     """
     src = Path(website_filled_path.path)
     dst = src.parent / f"{src.name}-built"
-    logger.info("Installing website dependencies and building to static HTML/CSS/JS")
+    logger.info("Building website to static HTML/CSS/JS")
 
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
-
-    run_cmd(["npm", "ci"], cwd=dst)
-    logger.debug("Website dependencies installed")
+    _copy_site_with_deps(src, dst, node_modules)
 
     run_cmd(["npm", "run", "build"], cwd=dst)
     logger.debug("Website built successfully")
@@ -157,31 +264,28 @@ def install_deps_and_build_website(website_filled_path: ContentDir) -> ContentDi
 
 
 @task(namespace="mkcd2app")
-def install_deps_and_build_website_singlefile(
-    website_filled_path: ContentDir,
+def build_website_singlefile(
+    website_filled_path: ContentDir, node_modules: ContentDir
 ) -> ContentFile:
     """
-    Make a copy of the template website, then ``npm ci`` and `npm run build:singlefile` in it.
+    Make a copy of the filled website with node_modules, then
+    `npm run build:singlefile` in it.
 
     We copy so that we never mutate a ContentDir that another task owns,
     keeping ContentDir hashes stable for caching.
 
-    Example input: racers-website-filled
+    Example input: racers-website-filled, racers-website-deps/node_modules
     Example output: index.html
 
-    :param website_filled_path: A redun.ContentDir pointing to the template website.
+    :param website_filled_path: A redun.ContentDir pointing to the filled website.
+    :param node_modules: A redun.ContentDir pointing to the installed dependencies.
     :return: A redun.ContentFile pointing to the single-file HTML.
     """
     src = Path(website_filled_path.path)
     dst = src.parent / f"{src.name}-singlefile-built"
-    logger.info("Installing website dependencies and building to static HTML file")
+    logger.info("Building website to static HTML file")
 
-    if dst.exists():
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst)
-
-    run_cmd(["npm", "ci"], cwd=dst)
-    logger.debug("Website dependencies installed")
+    _copy_site_with_deps(src, dst, node_modules)
 
     run_cmd(["npm", "run", "build:singlefile"], cwd=dst)
     logger.debug("Website built successfully")

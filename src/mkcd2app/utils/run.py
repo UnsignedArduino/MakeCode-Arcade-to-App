@@ -22,7 +22,11 @@ class BuildError(Exception):
         super().__init__(f"{command} failed ({return_code}) in {cwd}")
 
 
-def run_cmd(command: list[str], cwd: Path | str) -> str:
+def run_cmd(
+    command: list[str],
+    cwd: Path | str,
+    which_path: str | os.PathLike[str] | None = None,
+) -> str:
     """
     Runs a command (as a list, no shell) and captures its output.
 
@@ -32,11 +36,12 @@ def run_cmd(command: list[str], cwd: Path | str) -> str:
 
     :param command: The command as a list of arguments, e.g. ``["npm", "ci"]``.
     :param cwd: The working directory to execute the command in.
+    :param which_path: The path to pass to shutil.which, to search for the binary.
     :return: The stdout.
     :raises BuildError: If the command fails.
     :raises FileNotFoundError: If the executable cannot be found on PATH.
     """
-    resolved = shutil.which(command[0])
+    resolved = shutil.which(command[0], path=which_path)
     if resolved is None:
         raise FileNotFoundError(
             f"Executable '{command[0]}' not found on PATH. "
@@ -45,8 +50,20 @@ def run_cmd(command: list[str], cwd: Path | str) -> str:
     cmd_list = [resolved, *command[1:]]
     logger.debug(f"Running {command} in {cwd}")
     proc = subprocess.run(
-        cmd_list, shell=False, cwd=cwd, capture_output=True, text=True, check=False
+        cmd_list,
+        shell=False,
+        cwd=cwd,
+        capture_output=True,
+        check=False,
+        encoding="utf-8",
+        errors="replace",
     )
+    output = f"{proc.stdout}\n{proc.stderr}"
     if proc.returncode != 0:
-        raise BuildError(command, cwd, proc.returncode, proc.stdout + proc.stderr)
-    return proc.stdout
+        logger.error(
+            f"{command} in {cwd} failed ({proc.returncode}), output is below:\n{output}"
+        )
+        raise BuildError(command, cwd, proc.returncode, output)
+    else:
+        logger.debug(f"{command} in {cwd} output:\n{output}")
+        return proc.stdout

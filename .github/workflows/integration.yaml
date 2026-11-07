@@ -1,0 +1,50 @@
+name: Integration tests
+
+on:
+  push:
+    branches: [ main ]
+  # Any base branch, so stacked PRs get CI too
+  pull_request:
+
+# A new push to a PR cancels that PR's runs still going for older commits. Pushes to
+# main are never cancelled, so every merged commit gets a full run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check-skip:
+    uses: ./.github/workflows/check-skip.yaml
+    permissions:
+      contents: read
+    with:
+      tier: integration
+
+  integration:
+    needs: check-skip
+    if: needs.check-skip.outputs.skip != 'true'
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync
+
+      # Offline and fast; npm and mkc are faked, so no Node.js or toolchain install
+      - name: Run integration tests with coverage
+        run: uv run pytest -m integration -n 4

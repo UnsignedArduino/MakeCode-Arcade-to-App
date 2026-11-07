@@ -16,6 +16,8 @@ def create_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     logger = logging.getLogger(name=name)
     logger.setLevel(level=level)
     logger.propagate = False
+    # So creating a logger twice doesn't log every message twice
+    logger.handlers.clear()
 
     console_formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -26,14 +28,12 @@ def create_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     stdout_handler.setLevel(level=level)
     stdout_handler.addFilter(lambda record: record.levelno < logging.WARNING)
     stdout_handler.setFormatter(fmt=console_formatter)
-    if stdout_handler not in logger.handlers:
-        logger.addHandler(hdlr=stdout_handler)
+    logger.addHandler(hdlr=stdout_handler)
 
     stderr_handler = logging.StreamHandler(stream=sys.stderr)
     stderr_handler.setLevel(level=logging.WARNING)
     stderr_handler.setFormatter(fmt=console_formatter)
-    if stderr_handler not in logger.handlers:
-        logger.addHandler(hdlr=stderr_handler)
+    logger.addHandler(hdlr=stderr_handler)
 
     logger.debug(f"Created logger named {name!r} with level {level!r}")
     logger.debug(f"Handlers for {name!r}: {logger.handlers!r}")

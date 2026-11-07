@@ -4,4 +4,7 @@ __pycache__/
 examples/*
 !examples/*.yaml
 !examples/*.png
+tests/fixtures/build/
 .idea
+.coverage
+.coverage.*

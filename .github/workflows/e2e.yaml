@@ -1,13 +1,28 @@
-name: CI
+name: E2E tests
 
 on:
   push:
     branches: [ main ]
+  # Any base branch, so stacked PRs get CI too
   pull_request:
-    branches: [ main ]
+
+# A new push to a PR cancels that PR's runs still going for older commits. Pushes to
+# main are never cancelled, so every merged commit gets a full run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  check-skip:
+    uses: ./.github/workflows/check-skip.yaml
+    permissions:
+      contents: read
+    with:
+      tier: e2e
+
   e2e:
+    needs: check-skip
+    if: needs.check-skip.outputs.skip != 'true'
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
@@ -35,5 +50,7 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run tests with pytest
-        run: uv run pytest
+      # Coverage is skipped: the tests run the mkcd2app executable in a subprocess,
+      #  which coverage doesn't measure
+      - name: Run e2e tests
+        run: uv run pytest -m e2e --no-cov

@@ -1,0 +1,12 @@
+{
+  "name": "empty_project",
+  "description": "",
+  "dependencies": {
+    "device": "*"
+  },
+  "files": [
+    "main.ts",
+    "README.md",
+    "assets.json"
+  ]
+}
