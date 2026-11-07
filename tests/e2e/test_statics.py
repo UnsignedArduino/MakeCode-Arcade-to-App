@@ -88,6 +88,9 @@ def tasks_that_ran(redun_output: str) -> set[str]:
 
 @pytest.fixture(scope="session", autouse=True)
 def installed_toolchain_and_target(pytestconfig: pytest.Config) -> Generator[None]:
+    # Each xdist worker would run this fixture, all installing into the same dir below
+    if "PYTEST_XDIST_WORKER" in os.environ:
+        pytest.fail("The e2e tests can't run under xdist; drop -n or deselect them")
     # Install into a dir under .pytest_cache instead of the real user dirs; it
     # persists between sessions so reruns hit the install's redun cache
     home = pytestconfig.cache.mkdir("mkcd2app-home")

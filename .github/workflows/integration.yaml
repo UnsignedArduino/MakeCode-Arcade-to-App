@@ -47,4 +47,4 @@ jobs:
 
       # Offline and fast; npm and mkc are faked, so no Node.js or toolchain install
       - name: Run integration tests with coverage
-        run: uv run pytest -m integration
+        run: uv run pytest -m integration -n 4

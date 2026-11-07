@@ -18,15 +18,18 @@ uv run ruff format --check .     # format check (drop --check to apply)
 uv run mypy .                    # strict type check
 uv run pytest                    # all tests, with a coverage report
 uv run pytest -m unit            # only the fast offline tests (tests/unit)
-uv run pytest -m integration     # only the offline scheduler tests (tests/integration)
-uv run pytest -m e2e --no-cov    # only the e2e tests (tests/e2e)
+uv run pytest -m integration -n 4  # only the offline scheduler tests (tests/integration)
+uv run pytest -m e2e --no-cov    # only the e2e tests (tests/e2e); these can't use -n
 uv run pytest --no-cov           # skip coverage (e.g. when using a debugger)
 uv run pytest tests/e2e/test_statics.py::test_empty_game_build_to_statics_static
 ```
 
 CI runs exactly these commands: `lint.yaml` the lint/format/mypy checks, and
-`unit.yaml` (`-m unit`), `integration.yaml` (`-m integration`) and `e2e.yaml`
-(`-m e2e --no-cov`) the tests, independently, on ubuntu/windows/macos. Every test must
+`unit.yaml` (`-m unit`), `integration.yaml` (`-m integration -n 4`) and `e2e.yaml`
+(`-m e2e --no-cov`) the tests, independently, on ubuntu/windows/macos. Only integration
+uses xdist: the unit tests are no faster with it, and more than 4 workers didn't help
+integration. `-n` isn't in `addopts`, since `--pdb` and `-s` don't work under xdist.
+Every test must
 be under `tests/unit`, `tests/integration` or `tests/e2e`, or collection fails, since a
 test anywhere else would run in no workflow. Test file names must be unique across those
 folders, since they have no `__init__.py`. Warnings are errors in pytest.
@@ -68,6 +71,9 @@ Notes on the integration tests:
 Notes on the e2e tests:
 - Run pytest from the repo root: tests use repo-relative paths, and shell out to the
   installed `mkcd2app` executable rather than importing it.
+- They fail under xdist: each worker would run the session fixture, all installing into
+  the same dir at once, and repeat the module fixtures' builds. So deselect them to use
+  `-n` across tiers: `uv run pytest -m "not e2e" -n 4`.
 - Builds go in temp folders, each with a copy of the game and config next to each other,
   since a config's relative paths are relative to it. A full build takes about a minute,
   so share one (module fixtures) where a test only needs to read the output.
